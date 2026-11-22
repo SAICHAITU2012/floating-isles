@@ -20,7 +20,9 @@
   const T = THREE;
   const PARAMS = new URLSearchParams(location.search);
   const STATIC = PARAMS.has("static");
-  const FORCED_STATION = PARAMS.has("at") ? parseFloat(PARAMS.get("at")) : null;
+  const FORCED_STATION = PARAMS.has("at")
+    ? parseFloat(PARAMS.get("at"))
+    : (PARAMS.has("station") ? parseFloat(PARAMS.get("station")) : null);
   const MOBILE = () => window.innerWidth < 768;
 
   /* ── 1. RENDERER & COMPOSER SETUP ──────────────────────────────────── */
@@ -174,6 +176,7 @@
   }
 
   const animatedMaterials = [];
+  const rotatingElements = [];
 
   /* ── 3. VIBRANT FANTASY LIGHTING ───────────────────────────────────── */
 
@@ -262,84 +265,273 @@
   const skyDome = new T.Mesh(skyGeo, skyMat);
   scene.add(skyDome);
 
-  // Sea of Clouds Beneath Islands (y = -55)
+  // ═══════════════════════════════════════════════════════════════════
+  // VIBRANT MAGICAL REALM BOTTOM — Radiant Sunset Cloud Sea, Festival Lanterns & Stardust
+  // ═══════════════════════════════════════════════════════════════════
   const cloudSeaGroup = new T.Group();
   scene.add(cloudSeaGroup);
 
-  const cloudPuffGeo = new T.DodecahedronGeometry(18, 2);
-  const cloudPuffMat = new T.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.9,
-    metalness: 0.05,
-    flatShading: true,
+  // 1. Fluid Luminous Ethereal Cloud Sea Shader (y = -115)
+  // Continuous glowing pastel gradients with gentle animated wave undulations
+  const seaShaderMat = new T.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uDeepColor: { value: new T.Color(0x2e1065) }, // deep twilight violet
+      uMidColor:  { value: new T.Color(0xec4899) }, // glowing sunrise pink
+      uHighColor: { value: new T.Color(0xfbbf24) }, // golden morning amber
+      uFoamColor: { value: new T.Color(0x38bdf8) }, // celestial sky turquoise
+    },
+    vertexShader: `
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+      void main() {
+        vUv = uv;
+        vec3 p = position;
+        float wave = sin(p.x * 0.015 + uTime * 0.4) * cos(p.y * 0.015 + uTime * 0.3) * 6.0;
+        wave += sin(p.x * 0.03 - uTime * 0.25) * 3.0;
+        p.z += wave;
+        vWorldPos = (modelMatrix * vec4(p, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uDeepColor;
+      uniform vec3 uMidColor;
+      uniform vec3 uHighColor;
+      uniform vec3 uFoamColor;
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vWorldPos;
+      void main() {
+        float r = length(vWorldPos.xz) / 360.0;
+        float wavePattern = sin(vWorldPos.x * 0.02 + uTime * 0.5) * cos(vWorldPos.z * 0.02 + uTime * 0.4);
+        
+        vec3 col = mix(uDeepColor, uMidColor, smoothstep(0.0, 0.45, wavePattern * 0.5 + 0.5));
+        col = mix(col, uHighColor, smoothstep(0.4, 0.85, wavePattern * 0.5 + 0.5));
+        col = mix(col, uFoamColor, smoothstep(0.7, 1.0, sin(vWorldPos.x * 0.05 + vWorldPos.z * 0.05 + uTime)));
+        
+        // Soft edge fade at outer horizon
+        float alpha = smoothstep(1.0, 0.25, r) * 0.88;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent: true,
+    side: T.DoubleSide,
+    depthWrite: false,
   });
-  applyGhibliToon(cloudPuffMat, {
-    shadowTint: new T.Color(0x8eb9eb),
-    rimColor: new T.Color(0xfff8e7),
+  animatedMaterials.push(seaShaderMat);
+
+  const seaPlaneGeo = new T.PlaneGeometry(750, 750, 48, 48);
+  const seaPlane = new T.Mesh(seaPlaneGeo, seaShaderMat);
+  seaPlane.rotation.x = -Math.PI / 2;
+  seaPlane.position.y = -115;
+  cloudSeaGroup.add(seaPlane);
+
+  // 2. Soft Glowing Cumulus Clouds (Smooth SphereGeometry, no harsh faceted polygons)
+  const softCloudMat = new T.MeshStandardMaterial({
+    roughness: 0.4,
+    metalness: 0.1,
+    flatShading: false,
+    transparent: true,
+    opacity: 0.88,
+  });
+  applyGhibliToon(softCloudMat, {
+    shadowTint: new T.Color(0xd8b4fe), // lavender shadow
+    rimColor: new T.Color(0xfef08a),   // golden rim light
   });
 
-  const puffCount = 42;
-  const puffMesh = new T.InstancedMesh(cloudPuffGeo, cloudPuffMat, puffCount);
-  puffMesh.castShadow = false;
-  puffMesh.receiveShadow = false;
+  const puffGeo = new T.SphereGeometry(22, 14, 12);
+  const puffCount = 48;
+  const puffMesh = new T.InstancedMesh(puffGeo, softCloudMat, puffCount);
+  const pastelColors = [
+    new T.Color(0xfbcfe8), // rosewater
+    new T.Color(0xfde68a), // warm amber
+    new T.Color(0xc4b5fd), // twilight lavender
+    new T.Color(0xbae6fd), // crystal cyan
+    new T.Color(0xfed7aa), // soft peach
+  ];
 
   const dummy = new T.Object3D();
   for (let i = 0; i < puffCount; i++) {
-    const angle = (i / puffCount) * Math.PI * 2 + (Math.sin(i * 3.7) * 0.4);
-    const radius = 90 + (i % 6) * 35 + Math.cos(i * 2.1) * 20;
+    const angle = (i / puffCount) * Math.PI * 2 + (Math.sin(i * 3.7) * 0.5);
+    const radius = 95 + (i % 6) * 35;
     const px = Math.cos(angle) * radius;
     const pz = Math.sin(angle) * radius;
-    const py = -58 + Math.sin(i * 5.1) * 8;
-    const sx = 1.4 + Math.sin(i * 1.3) * 0.6;
-    const sy = 0.5 + Math.cos(i * 2.7) * 0.2;
-    const sz = 1.4 + Math.cos(i * 1.9) * 0.6;
+    const py = -112 + Math.sin(i * 3.1) * 8;
+    const sx = 1.6 + Math.sin(i * 1.5) * 0.5;
+    const sy = 0.55 + Math.cos(i * 2.2) * 0.15; // softly flattened cumulus
+    const sz = 1.6 + Math.cos(i * 1.7) * 0.5;
 
     dummy.position.set(px, py, pz);
-    dummy.scale.set(sx * 1.6, sy * 1.4, sz * 1.6);
-    dummy.rotation.set(0.1 * i, 0.4 * i, 0.05 * i);
+    dummy.scale.set(sx, sy, sz);
+    dummy.rotation.set(0, angle, 0);
     dummy.updateMatrix();
     puffMesh.setMatrixAt(i, dummy.matrix);
+    puffMesh.setColorAt(i, pastelColors[i % pastelColors.length]);
   }
   puffMesh.instanceMatrix.needsUpdate = true;
+  if (puffMesh.instanceColor) puffMesh.instanceColor.needsUpdate = true;
   cloudSeaGroup.add(puffMesh);
 
-  // Subtle Rainbow Arc behind Hero Island
-  const rainbowGeo = new T.TorusGeometry(85, 4.5, 8, 48, Math.PI * 0.75);
+  // 3. 36 Festival Sky Lanterns Rising from the Abyss (Warm Golden & Rose Glow)
+  const bottomSkyLanterns = [];
+  const lanternColors = [0xf59e0b, 0xf43f5e, 0xa855f7, 0x06b6d4, 0xfbbf24];
+  for (let lt = 0; lt < 36; lt++) {
+    const lColor = lanternColors[lt % lanternColors.length];
+    const lGroup = new T.Group();
+    
+    // Glowing lantern core
+    const lMat = new T.MeshStandardMaterial({
+      color: lColor,
+      emissive: lColor,
+      emissiveIntensity: 2.2,
+      roughness: 0.3,
+      transparent: true,
+      opacity: 0.92,
+    });
+    const lMesh = new T.Mesh(new T.CylinderGeometry(0.85, 0.70, 1.6, 8), lMat);
+    lMesh.position.y = 0.8;
+    lGroup.add(lMesh);
+
+    // Dark bamboo rings
+    const frameMat = new T.MeshStandardMaterial({ color: 0x451a03, roughness: 0.8 });
+    const topRim = new T.Mesh(new T.TorusGeometry(0.85, 0.06, 6, 12), frameMat);
+    topRim.rotation.x = Math.PI / 2;
+    topRim.position.y = 1.6;
+    lGroup.add(topRim);
+
+    const botRim = new T.Mesh(new T.TorusGeometry(0.70, 0.06, 6, 12), frameMat);
+    botRim.rotation.x = Math.PI / 2;
+    lGroup.add(botRim);
+
+    const lAngle = (lt / 36) * Math.PI * 2 + Math.sin(lt * 2.3) * 0.4;
+    const lDist = 55 + (lt % 7) * 22;
+    const lx = Math.cos(lAngle) * lDist;
+    const lz = Math.sin(lAngle) * lDist;
+    const ly = -105 + (lt % 12) * 6;
+
+    lGroup.position.set(lx, ly, lz);
+    lGroup.scale.set(1.4, 1.4, 1.4);
+    cloudSeaGroup.add(lGroup);
+
+    bottomSkyLanterns.push({
+      group: lGroup,
+      baseY: ly,
+      driftSpeed: 0.0006 + (lt % 5) * 0.0002,
+      seed: lt * 1.7,
+      baseX: lx,
+      baseZ: lz,
+    });
+  }
+  window.__bottomSkyLanterns = bottomSkyLanterns;
+
+  // 4. Floating Celestial Water-Lily Lotus Blossoms (Layered Curved Petals & Glowing Stamens)
+  const lotusGroup = new T.Group();
+  for (let lp = 0; lp < 16; lp++) {
+    const lotusSingle = new T.Group();
+    const lColor = lp % 3 === 0 ? 0xf43f5e : (lp % 3 === 1 ? 0xa855f7 : 0x06b6d4);
+    
+    // Golden radiant stamen core
+    const coreMesh = new T.Mesh(
+      new T.SphereGeometry(0.6, 8, 8),
+      new T.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfde047, emissiveIntensity: 3.5 })
+    );
+    coreMesh.position.y = 0.3;
+    lotusSingle.add(coreMesh);
+
+    // 8 Petals radiating outward
+    const petalMat = new T.MeshStandardMaterial({
+      color: lColor,
+      emissive: lColor,
+      emissiveIntensity: 1.2,
+      roughness: 0.25,
+      side: T.DoubleSide,
+    });
+    for (let p = 0; p < 8; p++) {
+      const pAngle = (p / 8) * Math.PI * 2;
+      const pet = new T.Mesh(new T.ConeGeometry(0.9, 2.4, 5), petalMat);
+      pet.rotation.z = Math.PI / 3;
+      pet.position.set(Math.cos(pAngle) * 1.5, 0.4, Math.sin(pAngle) * 1.5);
+      pet.rotation.y = -pAngle;
+      lotusSingle.add(pet);
+    }
+
+    const lAngle = (lp / 16) * Math.PI * 2;
+    const lDist = 90 + (lp % 4) * 32;
+    lotusSingle.position.set(Math.cos(lAngle) * lDist, -108, Math.sin(lAngle) * lDist);
+    lotusSingle.scale.set(2.4, 2.4, 2.4);
+    lotusGroup.add(lotusSingle);
+    rotatingElements.push({ obj: lotusSingle, rotateAxisY: true, speed: 0.006 * (lp % 2 === 0 ? 1 : -1) });
+  }
+  cloudSeaGroup.add(lotusGroup);
+
+  // Magnificent 7-Stripe Spectral Rainbow Arc Spanning Across the Sky
+  // Physically correct concentric spectral bands (Red, Orange, Yellow, Green, Cyan, Blue, Violet)
+  const rainbowGeo = new T.RingGeometry(95, 125, 96, 1, 0, Math.PI);
   const rainbowMat = new T.ShaderMaterial({
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.92,
     depthWrite: false,
     side: T.DoubleSide,
     vertexShader: `
-      varying vec2 vUv;
+      varying vec3 vLocalPos;
       void main() {
-        vUv = uv;
+        vLocalPos = position;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
-      varying vec2 vUv;
-      // Spectral rainbow palette
-      vec3 rainbow(float t) {
-        t = clamp(t, 0.0, 1.0);
-        vec3 c = vec3(
-          sin(t * 3.14159),
-          sin((t + 0.33) * 3.14159),
-          sin((t + 0.66) * 3.14159)
-        );
-        return clamp(c, 0.0, 1.0);
+      varying vec3 vLocalPos;
+      
+      // Authentic 7-stripe spectral color distribution
+      vec3 getRainbow(float t) {
+        // Inner arc (t = 0.0) to outer arc (t = 1.0)
+        if (t < 0.14) {
+          // Deep Royal Violet -> Indigo
+          return mix(vec3(0.58, 0.10, 0.96), vec3(0.18, 0.22, 0.95), t / 0.14);
+        } else if (t < 0.28) {
+          // Indigo -> Brilliant Sapphire Blue
+          return mix(vec3(0.18, 0.22, 0.95), vec3(0.02, 0.62, 1.0), (t - 0.14) / 0.14);
+        } else if (t < 0.43) {
+          // Sapphire Blue -> Vivid Cyan
+          return mix(vec3(0.02, 0.62, 1.0), vec3(0.0, 0.92, 0.85), (t - 0.28) / 0.15);
+        } else if (t < 0.58) {
+          // Vivid Cyan -> Emerald Spring Green
+          return mix(vec3(0.0, 0.92, 0.85), vec3(0.12, 0.92, 0.26), (t - 0.43) / 0.15);
+        } else if (t < 0.72) {
+          // Spring Green -> Bright Sunflower Yellow
+          return mix(vec3(0.12, 0.92, 0.26), vec3(1.0, 0.92, 0.02), (t - 0.58) / 0.14);
+        } else if (t < 0.86) {
+          // Sunflower Yellow -> Radiant Tangelo Orange
+          return mix(vec3(1.0, 0.92, 0.02), vec3(1.0, 0.48, 0.02), (t - 0.72) / 0.14);
+        } else {
+          // Tangelo Orange -> Vibrant Crimson Rose
+          return mix(vec3(1.0, 0.48, 0.02), vec3(1.0, 0.10, 0.20), (t - 0.86) / 0.14);
+        }
       }
+
       void main() {
-        float edge = sin(vUv.y * 3.14159);
-        vec3 col = rainbow(vUv.x);
-        float alpha = edge * 0.38;
+        // Radial distance from inner radius (95.0) to outer radius (125.0)
+        float r = length(vLocalPos.xy);
+        float t = clamp((r - 95.0) / (125.0 - 95.0), 0.0, 1.0);
+        vec3 col = getRainbow(t);
+        
+        // Soft edge feathering across inner and outer ring boundaries
+        float edgeRad = sin(t * 3.14159265);
+        edgeRad = smoothstep(0.01, 0.22, edgeRad);
+        
+        // Soft fade into horizon clouds at the arch bases (vLocalPos.y near 0)
+        float edgeArc = smoothstep(0.0, 18.0, vLocalPos.y);
+        
+        float alpha = edgeRad * edgeArc * 0.94;
         gl_FragColor = vec4(col, alpha);
       }
     `,
   });
   const rainbow = new T.Mesh(rainbowGeo, rainbowMat);
-  rainbow.position.set(15, 25, -95);
-  rainbow.rotation.set(0.2, 0.45, -0.25);
+  rainbow.position.set(12, -8, -125);
+  rainbow.rotation.set(0.14, 0.18, -0.05);
   scene.add(rainbow);
 
   /* ── 5. ASSET LOADER & 3D FANTASY WORLD GENERATION ─────────────────── */
@@ -885,14 +1077,887 @@
     return { beacon, gem, halo };
   }
 
+  /* ── 5.1B ANIME 3D GUIDE GIRLS, SKY CRAFTS & ARCANE GUARDIANS ────── */
+
+  /**
+   * Constructs an anime/Ghibli stylized 3D Guide Girl:
+   * Pleated skirt, tailored bodice, expressive anime head, styled hair with ribbons,
+   * posed arms (waving/holding), hovering diamond beacon, and invisible raycast hitbox.
+   */
+  function createGuideGirl(opts = {}) {
+    const {
+      name = "Guide",
+      role = "Island Guide",
+      dressColor = 0x06b6d4,
+      hairColor = 0x451a03,
+      accentColor = 0xf43f5e,
+      pose = "wave",
+      scale = 1.0,
+      stationIdx = 0,
+    } = opts;
+
+    const group = new T.Group();
+    group.scale.set(scale, scale, scale);
+
+    // 1. Pleated Flared Dress / Skirt
+    const skirtGeo = new T.CylinderGeometry(0.38, 1.15, 1.45, 14, 1, false);
+    const skirtMat = new T.MeshStandardMaterial({
+      color: dressColor,
+      roughness: 0.65,
+      metalness: 0.05,
+      flatShading: true,
+    });
+    applyGhibliToon(skirtMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0xfff1dc) });
+    const skirt = new T.Mesh(skirtGeo, skirtMat);
+    skirt.position.y = 0.95;
+    skirt.castShadow = true;
+    group.add(skirt);
+
+    // Skirt Hem Frill Trim (Accent Color)
+    const hemGeo = new T.TorusGeometry(1.16, 0.06, 6, 18);
+    const hemMat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+    const hem = new T.Mesh(hemGeo, hemMat);
+    hem.rotation.x = Math.PI / 2;
+    hem.position.y = 0.25;
+    group.add(hem);
+
+    // 2. Bodice & Blouse
+    const bodiceGeo = new T.CylinderGeometry(0.48, 0.40, 1.0, 12);
+    const bodiceMat = new T.MeshStandardMaterial({ color: 0xfffef5, roughness: 0.6 });
+    applyGhibliToon(bodiceMat, { shadowTint: new T.Color(0x334155), rimColor: new T.Color(0xfff8ed) });
+    const bodice = new T.Mesh(bodiceGeo, bodiceMat);
+    bodice.position.y = 2.05;
+    bodice.castShadow = true;
+    group.add(bodice);
+
+    // Vest / Corset Accent
+    const vestGeo = new T.CylinderGeometry(0.51, 0.43, 0.75, 12, 1, true);
+    const vestMat = new T.MeshStandardMaterial({ color: dressColor, roughness: 0.6 });
+    const vest = new T.Mesh(vestGeo, vestMat);
+    vest.position.y = 1.95;
+    group.add(vest);
+
+    // Collar Bow / Ribbon Tie
+    const bowGeo = new T.SphereGeometry(0.12, 8, 8);
+    const bowMat = new T.MeshStandardMaterial({ color: accentColor, roughness: 0.4 });
+    const bowCenter = new T.Mesh(bowGeo, bowMat);
+    bowCenter.position.set(0, 2.45, 0.48);
+    group.add(bowCenter);
+
+    const wingGeo = new T.ConeGeometry(0.16, 0.35, 6);
+    const bowL = new T.Mesh(wingGeo, bowMat);
+    bowL.rotation.set(0, 0, Math.PI / 2.8);
+    bowL.position.set(-0.2, 2.45, 0.46);
+    group.add(bowL);
+
+    const bowR = new T.Mesh(wingGeo, bowMat);
+    bowR.rotation.set(0, 0, -Math.PI / 2.8);
+    bowR.position.set(0.2, 2.45, 0.46);
+    group.add(bowR);
+
+    // 3. Anime Head & Facial Features
+    const headGeo = new T.SphereGeometry(0.46, 18, 16);
+    const skinMat = new T.MeshStandardMaterial({ color: 0xffdfc8, roughness: 0.7 });
+    const head = new T.Mesh(headGeo, skinMat);
+    head.position.y = 2.92;
+    head.castShadow = true;
+    group.add(head);
+
+    // Cute Anime Eyes (Dark Indigo / Sapphire with white specular highlights)
+    const eyeGeo = new T.SphereGeometry(0.09, 8, 8);
+    const eyeMat = new T.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
+    const eyeL = new T.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.16, 2.92, 0.42);
+    eyeL.scale.set(1.0, 1.25, 0.5);
+    group.add(eyeL);
+
+    const eyeR = new T.Mesh(eyeGeo, eyeMat);
+    eyeR.position.set(0.16, 2.92, 0.42);
+    eyeR.scale.set(1.0, 1.25, 0.5);
+    group.add(eyeR);
+
+    // Cheek Rosy Blush Decals
+    const blushGeo = new T.CircleGeometry(0.09, 12);
+    const blushMat = new T.MeshBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.55 });
+    const blushL = new T.Mesh(blushGeo, blushMat);
+    blushL.position.set(-0.26, 2.78, 0.40);
+    blushL.rotation.y = -0.35;
+    group.add(blushL);
+
+    const blushR = new T.Mesh(blushGeo, blushMat);
+    blushR.position.set(0.26, 2.78, 0.40);
+    blushR.rotation.y = 0.35;
+    group.add(blushR);
+
+    // 4. Stylized Anime Hair (Bangs, Side Locks, and Twin Tails/Ponytail)
+    const hairMat = new T.MeshStandardMaterial({ color: hairColor, roughness: 0.65, flatShading: true });
+    applyGhibliToon(hairMat, { shadowTint: new T.Color(0x1e1b4b), rimColor: new T.Color(0xfef08a) });
+
+    // Hair Top Cap
+    const hairCapGeo = new T.SphereGeometry(0.50, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.58);
+    const hairCap = new T.Mesh(hairCapGeo, hairMat);
+    hairCap.position.set(0, 2.95, -0.02);
+    group.add(hairCap);
+
+    // Swept Front Bangs
+    const bangGeo = new T.ConeGeometry(0.22, 0.45, 5);
+    const bang1 = new T.Mesh(bangGeo, hairMat);
+    bang1.rotation.set(-0.4, 0.2, 0.2);
+    bang1.position.set(-0.16, 3.12, 0.38);
+    group.add(bang1);
+
+    const bang2 = new T.Mesh(bangGeo, hairMat);
+    bang2.rotation.set(-0.4, -0.15, -0.2);
+    bang2.position.set(0.14, 3.14, 0.38);
+    group.add(bang2);
+
+    // Twin Side Tails / Locks
+    const tailGeo = new T.ConeGeometry(0.22, 1.1, 6);
+    const tailL = new T.Mesh(tailGeo, hairMat);
+    tailL.position.set(-0.52, 2.65, -0.05);
+    tailL.rotation.set(0.1, 0, 0.32);
+    group.add(tailL);
+
+    const tailR = new T.Mesh(tailGeo, hairMat);
+    tailR.position.set(0.52, 2.65, -0.05);
+    tailR.rotation.set(0.1, 0, -0.32);
+    group.add(tailR);
+
+    // Hair Ribbon Ties
+    const hairTieMat = new T.MeshStandardMaterial({ color: accentColor, roughness: 0.4 });
+    const tieL = new T.Mesh(new T.TorusGeometry(0.12, 0.04, 6, 12), hairTieMat);
+    tieL.position.set(-0.48, 3.12, -0.05);
+    group.add(tieL);
+    const tieR = new T.Mesh(new T.TorusGeometry(0.12, 0.04, 6, 12), hairTieMat);
+    tieR.position.set(0.48, 3.12, -0.05);
+    group.add(tieR);
+
+    // 5. Slender Arms & Animated Pose
+    const armGeo = new T.CylinderGeometry(0.10, 0.09, 0.85, 8);
+    const sleeveMat = new T.MeshStandardMaterial({ color: dressColor, roughness: 0.6 });
+
+    // Left Arm (holding item or relaxed)
+    const armL = new T.Mesh(armGeo, sleeveMat);
+    armL.position.set(-0.62, 1.85, 0.05);
+    armL.rotation.set(0.1, 0, 0.15);
+    group.add(armL);
+
+    // Right Arm (Posed for waving or holding)
+    const waveArmPivot = new T.Group();
+    waveArmPivot.position.set(0.58, 2.35, 0.05);
+    const armR = new T.Mesh(armGeo, sleeveMat);
+    armR.position.set(0, -0.35, 0);
+
+    if (pose === "wave") {
+      // Waved up high
+      waveArmPivot.rotation.set(0.15, 0, -Math.PI * 0.65);
+    } else {
+      waveArmPivot.rotation.set(0.2, 0, -0.2);
+    }
+    waveArmPivot.add(armR);
+
+    // Hand with skin tone
+    const handMesh = new T.Mesh(new T.SphereGeometry(0.11, 8, 8), skinMat);
+    handMesh.position.set(0, -0.78, 0);
+    waveArmPivot.add(handMesh);
+    group.add(waveArmPivot);
+
+    // 6. Accessories by Station / Role
+    if (pose === "read" || role.includes("Architect")) {
+      // Blueprint scroll / magical tome
+      const bookGeo = new T.BoxGeometry(0.45, 0.55, 0.12);
+      const bookMat = new T.MeshStandardMaterial({ color: 0x92400e, roughness: 0.4 });
+      const book = new T.Mesh(bookGeo, bookMat);
+      book.position.set(0.0, 1.85, 0.65);
+      book.rotation.set(0.4, 0, 0);
+      group.add(book);
+    } else if (role.includes("Astronomer") || role.includes("Priestess")) {
+      // Golden Astrolabe / Crystal Staff
+      const staffGeo = new T.CylinderGeometry(0.04, 0.04, 2.2, 8);
+      const staffMat = new T.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.6, roughness: 0.25 });
+      const astStaff = new T.Mesh(staffGeo, staffMat);
+      astStaff.position.set(-0.55, 1.6, 0.45);
+      astStaff.rotation.set(0.2, 0, 0.1);
+      const gemOrb = new T.Mesh(
+        new T.OctahedronGeometry(0.22, 0),
+        new T.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 1.2 })
+      );
+      gemOrb.position.set(0, 1.15, 0);
+      astStaff.add(gemOrb);
+      group.add(astStaff);
+    }
+
+    // 7. Floating Overhead Beacon Diamond
+    const beaconGeo = new T.OctahedronGeometry(0.32, 0);
+    const beaconMat = new T.MeshStandardMaterial({
+      color: accentColor,
+      emissive: accentColor,
+      emissiveIntensity: 1.5,
+      roughness: 0.1,
+    });
+    const beaconDiamond = new T.Mesh(beaconGeo, beaconMat);
+    beaconDiamond.position.y = 4.3;
+    group.add(beaconDiamond);
+
+    // 8. Large Raycast Hit Cylinder (Makes clicking smooth and effortless)
+    const hitGeo = new T.CylinderGeometry(1.3, 1.3, 4.6, 8);
+    const hitMat = new T.MeshBasicMaterial({ transparent: true, opacity: 0.0, depthWrite: false });
+    const hitbox = new T.Mesh(hitGeo, hitMat);
+    hitbox.position.y = 2.3;
+    group.add(hitbox);
+
+    group.userData = {
+      isGuide: true,
+      name,
+      role,
+      stationIdx,
+      beaconDiamond,
+      waveArmPivot,
+      pose,
+    };
+
+    return {
+      group,
+      hitbox,
+      beaconDiamond,
+      waveArmPivot,
+      name,
+      role,
+      stationIdx,
+    };
+  }
+
+  /**
+   * Constructs the Two Mighty Arcane Stone & Gold Portal Guardians
+   * Standing tall flanking the Station 4 Portal gate with crossed staffs in neutral state,
+   * raising their staffs high to open the archway when the traveler nears!
+   */
+  function createPortalGuardians() {
+    const group = new T.Group();
+
+    function createSingleKnight(isLeft) {
+      const kGroup = new T.Group();
+
+      // Pedestal Stone Base
+      const baseGeo = new T.CylinderGeometry(1.8, 2.2, 1.2, 8);
+      const baseMat = new T.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, flatShading: true });
+      const base = new T.Mesh(baseGeo, baseMat);
+      base.position.y = 0.6;
+      kGroup.add(base);
+
+      // Armored Greaves / Boots
+      const legMat = new T.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.3 });
+      const legL = new T.Mesh(new T.CylinderGeometry(0.35, 0.45, 2.4, 8), legMat);
+      legL.position.set(-0.6, 2.4, 0);
+      kGroup.add(legL);
+      const legR = new T.Mesh(new T.CylinderGeometry(0.35, 0.45, 2.4, 8), legMat);
+      legR.position.set(0.6, 2.4, 0);
+      kGroup.add(legR);
+
+      // Torso & Obsidian Cuirass
+      const cuirassGeo = new T.BoxGeometry(1.6, 2.2, 1.2);
+      const cuirassMat = new T.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.6 });
+      const cuirass = new T.Mesh(cuirassGeo, cuirassMat);
+      cuirass.position.y = 4.6;
+      kGroup.add(cuirass);
+
+      // Glowing Cyan Crest Emblem on Chest
+      const crestMesh = new T.Mesh(
+        new T.OctahedronGeometry(0.35, 0),
+        new T.MeshStandardMaterial({ color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 2.2 })
+      );
+      crestMesh.position.set(0, 4.8, 0.65);
+      crestMesh.scale.set(1.0, 1.3, 0.3);
+      kGroup.add(crestMesh);
+
+      // Broad Tiered Shoulder Pauldrons
+      const pauldronMat = new T.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
+      const pL = new T.Mesh(new T.BoxGeometry(0.8, 0.6, 1.1), pauldronMat);
+      pL.position.set(-1.1, 5.5, 0);
+      kGroup.add(pL);
+      const pR = new T.Mesh(new T.BoxGeometry(0.8, 0.6, 1.1), pauldronMat);
+      pR.position.set(1.1, 5.5, 0);
+      kGroup.add(pR);
+
+      // Knight Helm & Glowing Visor
+      const helmGeo = new T.BoxGeometry(1.0, 1.2, 1.0);
+      const helmMat = new T.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
+      const helm = new T.Mesh(helmGeo, helmMat);
+      helm.position.y = 6.4;
+      kGroup.add(helm);
+
+      const visorGeo = new T.BoxGeometry(0.8, 0.18, 0.1);
+      const visorMat = new T.MeshBasicMaterial({ color: 0x38bdf8 });
+      const visor = new T.Mesh(visorGeo, visorMat);
+      visor.position.set(0, 6.4, 0.52);
+      kGroup.add(visor);
+
+      // Staff Shoulder/Hand Pivot
+      const staffPivot = new T.Group();
+      staffPivot.position.set(isLeft ? 0.95 : -0.95, 4.2, 0.8);
+
+      // 10.5m Tall Ornate Guardian Staff
+      const staffHaftGeo = new T.CylinderGeometry(0.12, 0.12, 11.0, 8);
+      const staffHaftMat = new T.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.25 });
+      const haft = new T.Mesh(staffHaftGeo, staffHaftMat);
+      haft.position.set(0, 5.2, 0);
+      staffPivot.add(haft);
+
+      // Glowing Runic Star Crystal at Staff Head
+      const crystalHead = new T.Mesh(
+        new T.OctahedronGeometry(0.75, 0),
+        new T.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 2.5,
+          roughness: 0.1,
+        })
+      );
+      crystalHead.position.set(0, 10.8, 0);
+      staffPivot.add(crystalHead);
+
+      kGroup.add(staffPivot);
+
+      return { kGroup, staffPivot };
+    }
+
+    const left = createSingleKnight(true);
+    left.kGroup.position.set(-9.5, 0, 0);
+    // Neutral crossed angle (points inward across gate)
+    left.staffPivot.rotation.z = 0.72;
+    group.add(left.kGroup);
+
+    const right = createSingleKnight(false);
+    right.kGroup.position.set(9.5, 0, 0);
+    // Neutral crossed angle (points inward across gate)
+    right.staffPivot.rotation.z = -0.72;
+    group.add(right.kGroup);
+
+    return {
+      group,
+      leftPivot: left.staffPivot,
+      rightPivot: right.staffPivot,
+    };
+  }
+
+  /**
+   * Constructs an Enchanting Striped Hot Air Balloon
+   * Drifting peacefully across the sky with wicker basket, suspension rigging & burner flame.
+   */
+  function createHotAirBalloon(opts = {}) {
+    const {
+      colorA = 0xdc2626,
+      colorB = 0xfffbeb,
+      scale = 1.0,
+      orbitRadius = 120,
+      orbitSpeed = 0.0008,
+      baseY = 65,
+      phaseOffset = 0,
+    } = opts;
+
+    const group = new T.Group();
+    group.scale.set(scale, scale, scale);
+
+    // Teardrop Canopy: Upper sphere + lower inverted cone
+    const topDome = new T.Mesh(
+      new T.SphereGeometry(5.2, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      new T.MeshStandardMaterial({ color: colorA, roughness: 0.6, flatShading: true })
+    );
+    group.add(topDome);
+
+    const lowerCone = new T.Mesh(
+      new T.CylinderGeometry(5.05, 1.4, 4.8, 20, 1, true),
+      new T.MeshStandardMaterial({ color: colorB, roughness: 0.6, flatShading: true })
+    );
+    lowerCone.position.y = -2.8;
+    group.add(lowerCone);
+
+    // Decorative Accent Stripes
+    const stripeRing = new T.Mesh(
+      new T.TorusGeometry(5.12, 0.18, 6, 24),
+      new T.MeshStandardMaterial({ color: colorA, roughness: 0.5 })
+    );
+    stripeRing.rotation.x = Math.PI / 2;
+    stripeRing.position.y = 0.4;
+    group.add(stripeRing);
+
+    // Burner Collar with warm flickering glow
+    const burner = new T.Mesh(
+      new T.CylinderGeometry(1.2, 1.2, 0.5, 12),
+      new T.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 })
+    );
+    burner.position.y = -5.3;
+    group.add(burner);
+
+    const flameMesh = new T.Mesh(
+      new T.OctahedronGeometry(0.55, 0),
+      new T.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 2.2 })
+    );
+    flameMesh.position.y = -5.1;
+    group.add(flameMesh);
+
+    // 4 Suspension Rigging Ropes
+    const ropeMat = new T.MeshBasicMaterial({ color: 0x334155 });
+    for (let r = 0; r < 4; r++) {
+      const ang = (r / 4) * Math.PI * 2 + Math.PI / 4;
+      const rope = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 2.6, 4), ropeMat);
+      rope.position.set(Math.cos(ang) * 0.9, -6.6, Math.sin(ang) * 0.9);
+      group.add(rope);
+    }
+
+    // Wicker Basket
+    const basket = new T.Mesh(
+      new T.CylinderGeometry(1.3, 1.1, 1.6, 8),
+      new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85, flatShading: true })
+    );
+    basket.position.y = -8.1;
+    basket.castShadow = true;
+    group.add(basket);
+
+    return {
+      group,
+      orbitRadius,
+      orbitSpeed,
+      baseY,
+      phaseOffset,
+      flameMesh,
+    };
+  }
+
+  /**
+   * Constructs a Vintage Fantasy Aeroplane / Biplane
+   * Flying gracefully in a wide loop across the universe with spinning dual propeller.
+   */
+  function createFantasyAirplane(opts = {}) {
+    const { scale = 1.0, orbitRadius = 145, speed = 0.0016, altitude = 52 } = opts;
+    const group = new T.Group();
+    group.scale.set(scale, scale, scale);
+
+    // Streamlined Crimson Fuselage
+    const fuseGeo = new T.CylinderGeometry(0.75, 0.35, 6.2, 10);
+    const fuseMat = new T.MeshStandardMaterial({ color: 0xbe123c, roughness: 0.45, metalness: 0.2 });
+    applyGhibliToon(fuseMat, { shadowTint: new T.Color(0x4c0519), rimColor: new T.Color(0xfecdd3) });
+    const fuse = new T.Mesh(fuseGeo, fuseMat);
+    fuse.rotation.x = Math.PI / 2;
+    fuse.castShadow = true;
+    group.add(fuse);
+
+    // Cream Nose Cone
+    const nose = new T.Mesh(
+      new T.ConeGeometry(0.78, 1.2, 10),
+      new T.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.5 })
+    );
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.z = 3.65;
+    group.add(nose);
+
+    // High-Speed Front Propeller
+    const propPivot = new T.Group();
+    propPivot.position.set(0, 0, 4.3);
+    const propBlade = new T.Mesh(
+      new T.BoxGeometry(3.6, 0.22, 0.06),
+      new T.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 })
+    );
+    propPivot.add(propBlade);
+    group.add(propPivot);
+
+    // Dual Biplane Wings (Upper & Lower)
+    const wingMat = new T.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.6 });
+    const wingGeo = new T.BoxGeometry(8.6, 0.12, 1.8);
+
+    const upperWing = new T.Mesh(wingGeo, wingMat);
+    upperWing.position.set(0, 1.25, 0.4);
+    upperWing.castShadow = true;
+    group.add(upperWing);
+
+    const lowerWing = new T.Mesh(wingGeo, wingMat);
+    lowerWing.position.set(0, -0.4, 0.4);
+    lowerWing.castShadow = true;
+    group.add(lowerWing);
+
+    // Inter-plane Wing Struts
+    const strutMat = new T.MeshStandardMaterial({ color: 0xbe123c, roughness: 0.5 });
+    [-3.6, 3.6].forEach((x) => {
+      const st = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 1.7, 6), strutMat);
+      st.position.set(x, 0.42, 0.4);
+      group.add(st);
+    });
+
+    // Tail Rudder & Elevators
+    const rudder = new T.Mesh(new T.BoxGeometry(0.12, 1.6, 1.4), strutMat);
+    rudder.position.set(0, 0.8, -3.1);
+    group.add(rudder);
+
+    const elev = new T.Mesh(new T.BoxGeometry(3.2, 0.1, 1.2), wingMat);
+    elev.position.set(0, 0.1, -3.1);
+    group.add(elev);
+
+    // Open Cockpit & Pilot
+    const pilotHead = new T.Mesh(
+      new T.SphereGeometry(0.38, 10, 10),
+      new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 })
+    );
+    pilotHead.position.set(0, 0.95, 0.15);
+    group.add(pilotHead);
+
+    return {
+      group,
+      propPivot,
+      orbitRadius,
+      speed,
+      altitude,
+    };
+  }
+
+  /**
+   * Constructs a charming low-poly animal / cat:
+   * Body, round head, perky ears, and gentle animated curving tail.
+   */
+  function createCat(coatColor = 0xf97316, hasWhitePaws = true) {
+    const group = new T.Group();
+
+    // Body
+    const bodyGeo = new T.SphereGeometry(0.38, 10, 10);
+    const catMat = new T.MeshStandardMaterial({ color: coatColor, roughness: 0.75, flatShading: true });
+    const body = new T.Mesh(bodyGeo, catMat);
+    body.scale.set(0.9, 1.1, 1.3);
+    body.position.y = 0.38;
+    group.add(body);
+
+    // Head
+    const headGeo = new T.SphereGeometry(0.32, 10, 10);
+    const head = new T.Mesh(headGeo, catMat);
+    head.position.set(0, 0.72, 0.35);
+    group.add(head);
+
+    // Pointed Triangular Ears
+    const earGeo = new T.ConeGeometry(0.12, 0.24, 4);
+    const earL = new T.Mesh(earGeo, catMat);
+    earL.position.set(-0.18, 1.0, 0.35);
+    earL.rotation.z = 0.25;
+    group.add(earL);
+
+    const earR = new T.Mesh(earGeo, catMat);
+    earR.position.set(0.18, 1.0, 0.35);
+    earR.rotation.z = -0.25;
+    group.add(earR);
+
+    // Tail (with animation pivot)
+    const tailPivot = new T.Group();
+    tailPivot.position.set(0, 0.32, -0.42);
+    const tailMesh = new T.Mesh(
+      new T.CylinderGeometry(0.06, 0.04, 0.65, 6),
+      catMat
+    );
+    tailMesh.position.set(0, 0.3, -0.15);
+    tailMesh.rotation.x = -Math.PI / 4;
+    tailPivot.add(tailMesh);
+    group.add(tailPivot);
+
+    return { group, tailPivot };
+  }
+
+  /**
+   * Constructs blooming colorful wild flower patches
+   */
+  function createFlowerPatch(radius = 3.2, count = 18) {
+    const group = new T.Group();
+    const colors = [0xef4444, 0xfbbf24, 0xa855f7, 0x06b6d4, 0xf43f5e, 0xffffff];
+    const stemGeo = new T.CylinderGeometry(0.03, 0.03, 0.45, 4);
+    const stemMat = new T.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
+
+    for (let i = 0; i < count; i++) {
+      const fGroup = new T.Group();
+      const r = Math.sqrt(Math.random()) * radius;
+      const th = Math.random() * Math.PI * 2;
+      fGroup.position.set(Math.cos(th) * r, 0, Math.sin(th) * r);
+
+      const stem = new T.Mesh(stemGeo, stemMat);
+      stem.position.y = 0.22;
+      fGroup.add(stem);
+
+      const fColor = colors[i % colors.length];
+      const headMesh = new T.Mesh(
+        new T.OctahedronGeometry(0.16, 0),
+        new T.MeshStandardMaterial({ color: fColor, roughness: 0.4 })
+      );
+      headMesh.position.y = 0.46;
+      fGroup.add(headMesh);
+
+      group.add(fGroup);
+    }
+    return group;
+  }
+
+  /**
+   * Constructs Playful Anime Children:
+   * Dynamic procedural Ghibli-inspired characters with colorful clothes, anime hair,
+   * expressive poses (standing, waving, sitting, cheering, jumping), and cheerful accessories.
+   */
+  function createAnimeChild(opts = {}) {
+    const {
+      shirtColor = 0xf59e0b,
+      pantsColor = 0x0284c7,
+      hairColor = 0x451a03,
+      hairStyle = "bob", // "bob", "pigtails", "spiky"
+      skinColor = 0xffedd5,
+      pose = "stand", // "stand", "sit", "cheer", "jump", "wave"
+      scale = 0.55,
+      hasBalloon = false,
+      balloonColor = 0xef4444,
+      hasPinwheel = false,
+    } = opts;
+
+    const group = new T.Group();
+    group.scale.set(scale, scale, scale);
+
+    const skinMat = new T.MeshStandardMaterial({ color: skinColor, roughness: 0.65 });
+    const hairMat = new T.MeshStandardMaterial({ color: hairColor, roughness: 0.8 });
+    const shirtMat = new T.MeshStandardMaterial({ color: shirtColor, roughness: 0.7 });
+    const pantsMat = new T.MeshStandardMaterial({ color: pantsColor, roughness: 0.8 });
+    const shoeMat = new T.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 });
+
+    // Torso / Shirt
+    const torsoGeo = new T.CylinderGeometry(0.32, 0.38, 0.85, 8);
+    const torso = new T.Mesh(torsoGeo, shirtMat);
+    torso.position.y = 1.15;
+    torso.castShadow = true;
+    group.add(torso);
+
+    // Head
+    const headGeo = new T.SphereGeometry(0.38, 10, 10);
+    const head = new T.Mesh(headGeo, skinMat);
+    head.position.y = 1.88;
+    head.castShadow = true;
+    group.add(head);
+
+    // Hair
+    const hairGroup = new T.Group();
+    hairGroup.position.set(0, 1.95, 0);
+    const hairCap = new T.Mesh(new T.SphereGeometry(0.41, 8, 8), hairMat);
+    hairCap.position.set(0, 0.05, -0.04);
+    hairGroup.add(hairCap);
+
+    if (hairStyle === "pigtails") {
+      [-0.38, 0.38].forEach((px) => {
+        const pt = new T.Mesh(new T.SphereGeometry(0.18, 6, 6), hairMat);
+        pt.position.set(px, 0.05, -0.12);
+        hairGroup.add(pt);
+      });
+    } else if (hairStyle === "spiky") {
+      for (let s = 0; s < 4; s++) {
+        const spike = new T.Mesh(new T.ConeGeometry(0.12, 0.32, 4), hairMat);
+        spike.position.set((s - 1.5) * 0.16, 0.36, 0.1);
+        spike.rotation.z = (s - 1.5) * -0.22;
+        hairGroup.add(spike);
+      }
+    }
+    group.add(hairGroup);
+
+    // Anime Eyes & Cheerful Blush
+    const eyeMat = new T.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 });
+    const blushMat = new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.9, transparent: true, opacity: 0.75 });
+    [-0.14, 0.14].forEach((ex) => {
+      const eye = new T.Mesh(new T.SphereGeometry(0.065, 6, 6), eyeMat);
+      eye.position.set(ex, 1.88, 0.34);
+      group.add(eye);
+      const blush = new T.Mesh(new T.SphereGeometry(0.06, 6, 6), blushMat);
+      blush.position.set(ex * 1.5, 1.80, 0.32);
+      group.add(blush);
+    });
+
+    // Arms & Pivots
+    const armGeo = new T.CylinderGeometry(0.09, 0.08, 0.65, 6);
+    const armL = new T.Group();
+    armL.position.set(-0.45, 1.45, 0);
+    const armLMesh = new T.Mesh(armGeo, shirtMat);
+    armLMesh.position.y = -0.28;
+    armL.add(armLMesh);
+    group.add(armL);
+
+    const armR = new T.Group();
+    armR.position.set(0.45, 1.45, 0);
+    const armRMesh = new T.Mesh(armGeo, shirtMat);
+    armRMesh.position.y = -0.28;
+    armR.add(armRMesh);
+    group.add(armR);
+
+    // Legs & Pivots
+    const legGeo = new T.CylinderGeometry(0.11, 0.09, 0.72, 6);
+    const legL = new T.Group();
+    legL.position.set(-0.20, 0.72, 0);
+    const legLMesh = new T.Mesh(legGeo, pantsMat);
+    legLMesh.position.y = -0.32;
+    legL.add(legLMesh);
+    const shoeL = new T.Mesh(new T.BoxGeometry(0.18, 0.14, 0.26), shoeMat);
+    shoeL.position.set(0, -0.66, 0.05);
+    legL.add(shoeL);
+    group.add(legL);
+
+    const legR = new T.Group();
+    legR.position.set(0.20, 0.72, 0);
+    const legRMesh = new T.Mesh(legGeo, pantsMat);
+    legRMesh.position.y = -0.32;
+    legR.add(legRMesh);
+    const shoeR = new T.Mesh(new T.BoxGeometry(0.18, 0.14, 0.26), shoeMat);
+    shoeR.position.set(0, -0.66, 0.05);
+    legR.add(shoeR);
+    group.add(legR);
+
+    // Apply Poses
+    if (pose === "sit") {
+      torso.position.y = 0.85;
+      head.position.y = 1.58;
+      hairGroup.position.set(0, 1.65, 0);
+      armL.position.set(-0.42, 1.15, 0.1);
+      armR.position.set(0.42, 1.15, 0.1);
+      legL.rotation.x = -Math.PI / 2.2;
+      legR.rotation.x = -Math.PI / 2.2;
+      legL.position.set(-0.20, 0.50, 0.2);
+      legR.position.set(0.20, 0.50, 0.2);
+    } else if (pose === "wave") {
+      armR.rotation.z = Math.PI * 0.75;
+      armR.rotation.x = 0.2;
+    } else if (pose === "cheer") {
+      armL.rotation.z = -Math.PI * 0.7;
+      armR.rotation.z = Math.PI * 0.7;
+    } else if (pose === "jump") {
+      armL.rotation.z = -Math.PI * 0.6;
+      armR.rotation.z = Math.PI * 0.6;
+      legL.rotation.x = 0.5;
+      legR.rotation.x = -0.5;
+    }
+
+    // Balloon accessory
+    if (hasBalloon) {
+      const stringGeo = new T.CylinderGeometry(0.015, 0.015, 1.8, 4);
+      const stringMesh = new T.Mesh(stringGeo, new T.MeshStandardMaterial({ color: 0xffffff }));
+      stringMesh.position.set(0.65, 2.3, 0.2);
+      group.add(stringMesh);
+
+      const balGeo = new T.SphereGeometry(0.45, 8, 8);
+      balGeo.scale(1, 1.25, 1);
+      const balMesh = new T.Mesh(
+        balGeo,
+        new T.MeshStandardMaterial({ color: balloonColor, roughness: 0.3, emissive: balloonColor, emissiveIntensity: 0.4 })
+      );
+      balMesh.position.set(0.65, 3.4, 0.2);
+      group.add(balMesh);
+    }
+
+    return { group, armL, armR, legL, legR, pose };
+  }
+
+  /**
+   * Constructs Cute Playful Bunnies
+   */
+  function createPlayfulBunny(furColor = 0xffffff) {
+    const group = new T.Group();
+    group.scale.set(0.55, 0.55, 0.55);
+
+    const bMat = new T.MeshStandardMaterial({ color: furColor, roughness: 0.85, flatShading: true });
+    const innerEarMat = new T.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.6 });
+
+    // Rounded body
+    const body = new T.Mesh(new T.SphereGeometry(0.35, 8, 8), bMat);
+    body.scale.set(1.0, 1.1, 1.2);
+    body.position.y = 0.35;
+    group.add(body);
+
+    // Head
+    const head = new T.Mesh(new T.SphereGeometry(0.28, 8, 8), bMat);
+    head.position.set(0, 0.65, 0.25);
+    group.add(head);
+
+    // Ears
+    [-0.12, 0.12].forEach((ex) => {
+      const ear = new T.Mesh(new T.CylinderGeometry(0.05, 0.07, 0.45, 6), bMat);
+      ear.position.set(ex, 1.0, 0.22);
+      ear.rotation.z = ex * -0.2;
+      group.add(ear);
+
+      const inner = new T.Mesh(new T.CylinderGeometry(0.02, 0.04, 0.35, 6), innerEarMat);
+      inner.position.set(ex, 1.0, 0.25);
+      inner.rotation.z = ex * -0.2;
+      group.add(inner);
+    });
+
+    // Fluffy tail
+    const tail = new T.Mesh(new T.SphereGeometry(0.12, 6, 6), bMat);
+    tail.position.set(0, 0.35, -0.42);
+    group.add(tail);
+
+    return group;
+  }
+
+  /**
+   * Constructs Bioluminescent Glowing Fairy Mushrooms
+   */
+  function createGlowingMushroomCluster(color = 0x06b6d4, count = 5) {
+    const group = new T.Group();
+    const stemMat = new T.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.9 });
+    const capMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 2.2,
+      roughness: 0.25,
+    });
+
+    for (let m = 0; m < count; m++) {
+      const mG = new T.Group();
+      const a = (m / count) * Math.PI * 2 + (m % 2) * 0.3;
+      const d = 0.25 + (m % 3) * 0.25;
+      mG.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
+
+      const h = 0.35 + (m % 4) * 0.12;
+      const stem = new T.Mesh(new T.CylinderGeometry(0.04, 0.06, h, 6), stemMat);
+      stem.position.y = h / 2;
+      mG.add(stem);
+
+      const cap = new T.Mesh(new T.ConeGeometry(0.24, 0.18, 8), capMat);
+      cap.position.y = h + 0.06;
+      mG.add(cap);
+
+      group.add(mG);
+    }
+    return group;
+  }
+
+  /**
+   * Constructs Festive Hanging Party Bunting Flags
+   */
+  function createFestiveBunting(startPt, endPt, numFlags = 7) {
+    const group = new T.Group();
+    const colors = [0xef4444, 0xf59e0b, 0x10b981, 0x06b6d4, 0x8b5cf6, 0xec4899];
+    const flagGeo = new T.ConeGeometry(0.24, 0.45, 3);
+    flagGeo.rotateZ(Math.PI);
+
+    for (let f = 1; f < numFlags; f++) {
+      const t = f / numFlags;
+      const x = T.MathUtils.lerp(startPt.x, endPt.x, t);
+      const sag = Math.sin(t * Math.PI) * 0.8;
+      const y = T.MathUtils.lerp(startPt.y, endPt.y, t) - sag;
+      const z = T.MathUtils.lerp(startPt.z, endPt.z, t);
+
+      const flag = new T.Mesh(
+        flagGeo,
+        new T.MeshStandardMaterial({ color: colors[f % colors.length], roughness: 0.6, side: T.DoubleSide })
+      );
+      flag.position.set(x, y, z);
+      group.add(flag);
+    }
+    return group;
+  }
+
   /* ── 5.2 3D CLEAR REFRACTIVE STARS & CELESTIAL FLOWERS ────────── */
 
   /**
    * Constructs a true 3D Clear Star Shape:
-   * A nonconvex 3D polyhedron (stellated icosahedron) with light-transmitting surfaces,
-   * visible internal/external edges, optical refraction (IOR 1.52), depth, and a luminous inner core diamond.
+   * A nonconvex 3D polyhedron (stellated icosahedron) with rich, saturated gem-like
+   * light-transmitting surfaces, crisp faceted reflections, and a luminous inner core diamond.
+   * Free of wireframe line clutter.
    */
-  function create3DClearStar(coreRadius = 1.8, spikeRadius = 4.4, color = 0x67e8f9) {
+  function create3DClearStar(coreRadius = 1.8, spikeRadius = 4.4, color = 0x38bdf8) {
     const starGroup = new T.Group();
 
     // 20-pointed stellated icosahedron (Kepler-Poinsot star)
@@ -916,13 +1981,14 @@
 
       // Face center normal
       const mx = (ax + bx + cx) / 3;
-      const my = (ay + by + cy) / 3;
+      const my = (ay + bx + cx) / 3; // safe fallback
       const mz = (az + bz + cz) / 3;
-      const mLen = Math.sqrt(mx * mx + my * my + mz * mz) || 1;
+      const trueMy = (ay + by + cy) / 3;
+      const mLen = Math.sqrt(mx * mx + trueMy * trueMy + mz * mz) || 1;
 
       // Spike tip extending outward along face normal
       const tipX = (mx / mLen) * spikeRadius;
-      const tipY = (my / mLen) * spikeRadius;
+      const tipY = (trueMy / mLen) * spikeRadius;
       const tipZ = (mz / mLen) * spikeRadius;
 
       // 3 triangular facets meeting at the sharp apex
@@ -935,61 +2001,36 @@
     starGeo.setAttribute("position", new T.Float32BufferAttribute(starPositions, 3));
     starGeo.computeVertexNormals();
 
-    // Clear, light-transmitting refractive crystal material revealing internal depth
+    // Saturated crystal gem material with crisp specular reflections
     const glassMat = new T.MeshPhysicalMaterial({
       color: color,
-      transmission: 0.82,
-      opacity: 0.82,
-      transparent: true,
-      roughness: 0.08,
-      reflectivity: 0.9,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.08,
       emissive: new T.Color(color),
-      emissiveIntensity: 0.95,
-      side: T.DoubleSide,
+      emissiveIntensity: 1.1,
+      roughness: 0.08,
+      metalness: 0.3,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.04,
       flatShading: true,
-      depthWrite: false,
+      depthWrite: true,
+      side: T.FrontSide,
     });
 
     const starMesh = new T.Mesh(starGeo, glassMat);
     starGroup.add(starMesh);
 
-    // Visible internal and external geometric facet edges
-    const edgesGeo = new T.EdgesGeometry(starGeo, 24);
-    const edgesMat = new T.LineBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.95,
-      blending: T.AdditiveBlending,
-    });
-    const edgesMesh = new T.LineSegments(edgesGeo, edgesMat);
-    starGroup.add(edgesMesh);
-
-    // Internal glowing starlight diamond inside the transparent star
-    const coreGeo = new T.OctahedronGeometry(coreRadius * 0.65, 0);
+    // Internal glowing starlight diamond heart inside the transparent star
+    const coreGeo = new T.OctahedronGeometry(coreRadius * 0.72, 0);
     const coreMat = new T.MeshStandardMaterial({
       color: color,
       emissive: color,
-      emissiveIntensity: 4.5,
+      emissiveIntensity: 4.8,
       roughness: 0.1,
-      metalness: 0.8,
+      metalness: 0.6,
     });
     const coreMesh = new T.Mesh(coreGeo, coreMat);
     starGroup.add(coreMesh);
 
-    // Glowing orbital halo ring
-    const ringGeo = new T.TorusGeometry(spikeRadius * 0.95, 0.08, 6, 32);
-    const ringMat = new T.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.85,
-      blending: T.AdditiveBlending,
-    });
-    const ringMesh = new T.Mesh(ringGeo, ringMat);
-    starGroup.add(ringMesh);
-
-    return { group: starGroup, starMesh, edgesMesh, coreMesh, ringMesh };
+    return { group: starGroup, starMesh, coreMesh, ringMesh: null };
   }
 
   /**
@@ -1014,11 +2055,11 @@
     const petalMat = new T.MeshStandardMaterial({
       color: petalColor,
       emissive: petalColor,
-      emissiveIntensity: 1.1,
-      roughness: 0.15,
-      metalness: 0.2,
+      emissiveIntensity: 0.85,
+      roughness: 0.35,
+      metalness: 0.05,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.96,
       side: T.DoubleSide,
     });
 
@@ -1296,12 +2337,12 @@
   // References to animated elements
   let birdMixer = null;
   const flyingBirds = [];
-  const rotatingElements = [];
   const floatingCrystals = [];
   const swimmingFish = [];
   const flyingFairies = [];
   const carnivalRides = [];
   const groundAnimals = [];
+  const catAnimData = [];
   const interactiveBeacons = [];
   const celestialStars = [];
   const celestialFlowers = [];
@@ -1650,6 +2691,22 @@
     const tower = instantiateModel("towerPointy", 16.0);
     if (tower) {
       tower.position.set(0, 2.5, 0);
+      // Apply rich fantasy stone colors to the tower parts
+      const towerColors = {
+        "LightRock": 0xd6c4a8,   // Warm sandstone
+        "Black": 0x334155,       // Slate trim
+        "Celing": 0x7c3aed,     // Royal purple roof
+        "DarkRock": 0x78716c,   // Weathered dark stone
+      };
+      tower.traverse((ch) => {
+        if (ch.isMesh && ch.material) {
+          const matName = ch.material.name || "";
+          if (matName.includes("LightRock")) ch.material.color.set(towerColors.LightRock);
+          else if (matName.includes("Black")) ch.material.color.set(towerColors.Black);
+          else if (matName.includes("Celing")) ch.material.color.set(towerColors.Celing);
+          else if (matName.includes("DarkRock")) ch.material.color.set(towerColors.DarkRock);
+        }
+      });
       station1Group.add(tower);
       clickTargets.push({ mesh: tower, stationIdx: 1, name: "Observatory Tower", type: "tower" });
     }
@@ -1691,30 +2748,45 @@
     station1Group.add(createBalloonCluster(-9, 2.5, 13, 7));
     station1Group.add(createBalloonCluster(19, 2.5, 4, 7));
 
-    // 6. Cherry Blossom (Sakura) & Golden Autumn Trees
+    // 6. Cherry Blossom (Sakura) & Golden Autumn Trees (Rich saturated anime foliage, dark bark trunks)
+    function styleAutumnTree(tree, leafColor) {
+      if (!tree) return;
+      tree.traverse((ch) => {
+        if (ch.isMesh && ch.material) {
+          const mName = (ch.material.name || "").toLowerCase();
+          const cName = (ch.name || "").toLowerCase();
+          if (mName.includes("wood") || cName.includes("1_1") || cName.includes("trunk")) {
+            ch.material.color.set(0x3e1f0e); // Rich dark bark brown
+          } else {
+            ch.material.color.set(leafColor); // Vibrant colorful foliage
+          }
+        }
+      });
+    }
+
     const sakuraTree = instantiateModel("treeAutumn", 9.5, true);
     if (sakuraTree) {
       sakuraTree.position.set(11, 2.5, 7);
-      sakuraTree.traverse((ch) => {
-        if (ch.isMesh && ch.material) ch.material.color.set(0xffb7c5);
-      });
+      styleAutumnTree(sakuraTree, 0xf43f5e); // Vivid Cherry Blossom Rose
       station1Group.add(sakuraTree);
     }
     const sak2 = instantiateModel("treeAutumn", 8.5, true);
     if (sak2) {
       sak2.position.set(-18, 2.5, 2);
-      sak2.traverse((ch) => {
-        if (ch.isMesh && ch.material) ch.material.color.set(0xffa7b8);
-      });
+      styleAutumnTree(sak2, 0xec4899); // Brilliant Magenta Blossom
       station1Group.add(sak2);
     }
     const aut1 = instantiateModel("treeAutumn", 9.0, true);
     if (aut1) {
       aut1.position.set(6, 2.5, -17);
-      aut1.traverse((ch) => {
-        if (ch.isMesh && ch.material) ch.material.color.set(0xf59e0b);
-      });
+      styleAutumnTree(aut1, 0xf59e0b); // Glowing Golden Amber Autumn
       station1Group.add(aut1);
+    }
+    // Emerald Pine
+    const pineObs = instantiateModel("treePine", 7.5, true);
+    if (pineObs) {
+      pineObs.position.set(-14, 2.5, -3);
+      station1Group.add(pineObs);
     }
 
     // 7. Ground Animals (Bunnies grazing on the grass)
@@ -1846,7 +2918,148 @@
           station2Group.add(plank);
         }
       }
+
+      // ── ENRICHMENT: Vibrant Flowers & Glowing Mushrooms on Every Island ──
+      const fPatch = createFlowerPatch(3.4, 14);
+      fPatch.position.set(0, 1.0, 0);
+      isleG.add(fPatch);
+
+      const mush = createGlowingMushroomCluster(proj.color, 5);
+      mush.position.set(2.2, 1.0, 1.8);
+      isleG.add(mush);
+
+      // ── ENRICHMENT: Island-Specific Children, Animals & Joyful Details ──
+      if (idx === 0) {
+        // Island 0: Generative UI — Child sitting dangling feet over edge + playful cat
+        const child0 = createAnimeChild({
+          pose: "sit", shirtColor: 0x06b6d4, pantsColor: 0x1e1b4b,
+          hairColor: 0x451a03, hairStyle: "bob", scale: 0.65
+        });
+        child0.group.position.set(0, 1.1, 4.2);
+        child0.group.rotation.y = 0;
+        isleG.add(child0.group);
+
+        const cat0 = createCat(0xf97316);
+        cat0.group.position.set(1.4, 1.0, 3.8);
+        cat0.group.rotation.y = -0.4;
+        isleG.add(cat0.group);
+        catAnimData.push(cat0);
+      } else if (idx === 1) {
+        // Island 1 (Middle): Web to Shell — Cheering Child with Balloon + Ginger Tabby + Bunny
+        const child1 = createAnimeChild({
+          pose: "cheer", shirtColor: 0xa855f7, pantsColor: 0xf43f5e,
+          hairColor: 0x1c1917, hairStyle: "pigtails", scale: 0.65,
+          hasBalloon: true, balloonColor: 0xf43f5e
+        });
+        child1.group.position.set(2.4, 1.1, -1.2);
+        child1.group.rotation.y = -0.8;
+        isleG.add(child1.group);
+
+        const cat1 = createCat(0xfbbf24);
+        cat1.group.position.set(-2.0, 1.0, 1.5);
+        cat1.group.rotation.y = 0.5;
+        isleG.add(cat1.group);
+        catAnimData.push(cat1);
+
+        const bunny1 = createPlayfulBunny(0xffffff);
+        bunny1.position.set(0.8, 1.0, 2.2);
+        bunny1.rotation.y = 0.3;
+        isleG.add(bunny1);
+
+        // Party Bunting across the island
+        const bunting1 = createFestiveBunting(
+          new T.Vector3(-3.0, 4.0, 1.5),
+          new T.Vector3(2.5, 4.0, -1.0),
+          7
+        );
+        isleG.add(bunting1);
+      } else if (idx === 2) {
+        // Island 2 (Middle): Automations Agent — Child waving by the mill + Midnight Kitten
+        const child2 = createAnimeChild({
+          pose: "wave", shirtColor: 0xf59e0b, pantsColor: 0x06b6d4,
+          hairColor: 0x78350f, hairStyle: "spiky", scale: 0.65
+        });
+        child2.group.position.set(-2.2, 1.1, -1.8);
+        child2.group.rotation.y = 0.4;
+        isleG.add(child2.group);
+
+        const cat2 = createCat(0x18181b); // black cat with gold eyes
+        cat2.group.position.set(1.8, 1.0, 2.0);
+        cat2.group.rotation.y = -0.6;
+        isleG.add(cat2.group);
+        catAnimData.push(cat2);
+      } else if (idx === 3) {
+        // Island 3 (Middle): DNA Classifier — Picnic Scene: Sitting Child, Lavender Cat & Bunny
+        const child3 = createAnimeChild({
+          pose: "sit", shirtColor: 0x10b981, pantsColor: 0xfacc15,
+          hairColor: 0x0c0a09, hairStyle: "bob", scale: 0.65
+        });
+        child3.group.position.set(-1.0, 1.1, 1.2);
+        child3.group.rotation.y = 0.2;
+        isleG.add(child3.group);
+
+        // Picnic blanket
+        const blanket = new T.Mesh(
+          new T.BoxGeometry(2.4, 0.05, 2.4),
+          new T.MeshStandardMaterial({ color: 0xec4899, roughness: 0.9 })
+        );
+        blanket.position.set(-1.0, 1.02, 1.2);
+        isleG.add(blanket);
+
+        const cat3 = createCat(0xc084fc); // lavender fantasy cat
+        cat3.group.position.set(-2.2, 1.0, 1.2);
+        cat3.group.rotation.y = 0.8;
+        isleG.add(cat3.group);
+        catAnimData.push(cat3);
+
+        const bunny3 = createPlayfulBunny(0xfef3c7);
+        bunny3.position.set(1.4, 1.0, -1.5);
+        isleG.add(bunny3);
+      } else if (idx === 4) {
+        // Island 4: Anime Scenery Gen — Skygazing Child with Balloon + Tabby Kitten
+        const child4 = createAnimeChild({
+          pose: "stand", shirtColor: 0xec4899, pantsColor: 0x3b82f6,
+          hairColor: 0xb91c1c, hairStyle: "spiky", scale: 0.65,
+          hasBalloon: true, balloonColor: 0x38bdf8
+        });
+        child4.group.position.set(1.2, 1.1, -1.0);
+        child4.group.rotation.y = -0.5;
+        isleG.add(child4.group);
+
+        const cat4 = createCat(0xea580c);
+        cat4.group.position.set(-1.6, 1.0, 1.8);
+        cat4.group.rotation.y = 0.3;
+        isleG.add(cat4.group);
+        catAnimData.push(cat4);
+      } else if (idx === 5) {
+        // Island 5: Pi Pico Cluster — Cheering Child + Sleeping White Cat
+        const child5 = createAnimeChild({
+          pose: "cheer", shirtColor: 0x06b6d4, pantsColor: 0x475569,
+          hairColor: 0x451a03, hairStyle: "bob", scale: 0.65,
+          hasBalloon: true, balloonColor: 0x10b981
+        });
+        child5.group.position.set(-1.2, 1.1, 0);
+        child5.group.rotation.y = 0.6;
+        isleG.add(child5.group);
+
+        const cat5 = createCat(0xf8fafc);
+        cat5.group.position.set(1.5, 1.0, 1.5);
+        isleG.add(cat5.group);
+        catAnimData.push(cat5);
+      }
     });
+
+    // ── ANIMATED JUMPING CHILD — Joyously Leaping Along the Suspension Bridge ──
+    const jumpingChild = createAnimeChild({
+      pose: "jump",
+      shirtColor: 0xef4444, // vivid red sweater
+      pantsColor: 0x3b82f6, // bright blue shorts
+      hairColor: 0xd97706,  // golden auburn hair
+      hairStyle: "spiky",
+      scale: 0.68
+    });
+    station2Group.add(jumpingChild.group);
+    window.__jumpingChild = jumpingChild;
 
     // Animated Windmill at the center of the archipelago
     const mill = instantiateModel("windmill", 11.5);
@@ -1857,9 +3070,9 @@
       // Find the Mill_Blades node so we can spin it around the HORIZONTAL shaft
       mill.traverse((ch) => {
         if (ch.name === "Mill_Blades") {
-          // Mill_Blades has parent rotation [-PI/2, 0, x] so its local Y axis
-          // points horizontally in world space — that is the real blade shaft axis.
-          rotatingElements.push({ obj: ch, rotateAxisY: true, speed: 0.025 });
+          // The blades should rotate around the horizontal shaft (Z-axis in the model's
+          // local space which corresponds to the horizontal facing direction after parent rotation).
+          rotatingElements.push({ obj: ch, rotateAxisZ: true, speed: 0.025 });
         }
       });
     }
@@ -1875,13 +3088,13 @@
 
     // 7 Master Celestial Skill Nodes (Arranged in an expansive, balanced celestial arch)
     const SKILLS = [
-      { name: "Python",     type: "star",   pos: [-34, 18, 12],   color: 0x38bdf8, spike: 5.2, core: 1.9 }, // Sapphire
-      { name: "Three.js",   type: "flower", pos: [-22, 36, -8],   color: 0x10b981, scale: 3.2 },            // Emerald Lotus
-      { name: "React",      type: "star",   pos: [-4, 46, 8],     color: 0x06b6d4, spike: 4.8, core: 1.8 }, // Prismatic Ice
-      { name: "PyTorch",    type: "flower", pos: [14, 40, -12],   color: 0xf59e0b, scale: 3.0 },            // Golden Amber
-      { name: "TypeScript", type: "star",   pos: [30, 26, 6],     color: 0x8b5cf6, spike: 5.0, core: 1.8 }, // Royal Amethyst
-      { name: "GLSL",       type: "flower", pos: [36, 12, -10],   color: 0xec4899, scale: 3.4 },            // Sakura Blossom
-      { name: "Systems",    type: "star",   pos: [0, 20, -16],    color: 0xf43f5e, spike: 4.5, core: 1.7 }, // Ruby Star
+      { name: "Python",     type: "star",   pos: [-34, 18, 12],   color: 0x0284c7, spike: 5.6, core: 2.2 }, // Sapphire Gem
+      { name: "Three.js",   type: "flower", pos: [-22, 36, -8],   color: 0x059669, scale: 3.4 },            // Emerald Lotus
+      { name: "React",      type: "star",   pos: [-4, 46, 8],     color: 0x06b6d4, spike: 5.2, core: 2.0 }, // Cyan Diamond
+      { name: "PyTorch",    type: "flower", pos: [14, 40, -12],   color: 0xd97706, scale: 3.2 },            // Golden Amber
+      { name: "TypeScript", type: "star",   pos: [30, 26, 6],     color: 0x7c3aed, spike: 5.4, core: 2.1 }, // Royal Amethyst
+      { name: "GLSL",       type: "flower", pos: [36, 12, -10],   color: 0xe11d48, scale: 3.5 },            // Ruby Crimson Blossom
+      { name: "Systems",    type: "star",   pos: [0, 20, -16],    color: 0xf97316, spike: 5.0, core: 2.0 }, // Sunset Orange Star
     ];
 
     SKILLS.forEach((sk, i) => {
@@ -1900,11 +3113,11 @@
       }
     });
 
-    // 14 Vibrant Miniature Clear 3D Stars drifting across the celestial realm
-    const miniStarColors = [0x38bdf8, 0xf43f5e, 0xfbbf24, 0xa855f7, 0x10b981, 0x06b6d4, 0xec4899];
+    // 14 Saturated Vivid Miniature Clear 3D Stars drifting across the celestial realm
+    const miniStarColors = [0x0284c7, 0xe11d48, 0xd97706, 0x7c3aed, 0x059669, 0x06b6d4, 0xec4899];
     for (let m = 0; m < 14; m++) {
       const col = miniStarColors[m % miniStarColors.length];
-      const mini = create3DClearStar(0.7, 1.9, col);
+      const mini = create3DClearStar(0.9, 2.4, col);
       const mx = (Math.random() - 0.5) * 56;
       const my = 8 + Math.random() * 42;
       const mz = (Math.random() - 0.5) * 44;
@@ -1916,8 +3129,8 @@
 
     // 8 Delicate 3D Celestial Blossom Flowers
     for (let fl = 0; fl < 8; fl++) {
-      const flCol = [0xf472b6, 0x38bdf8, 0xfbbf24, 0x34d399, 0xc084fc][fl % 5];
-      const flower = create3DCelestialFlower(1.8, flCol, 0xfffbeb);
+      const flCol = [0xe11d48, 0x0284c7, 0xd97706, 0x059669, 0x7c3aed][fl % 5];
+      const flower = create3DCelestialFlower(2.2, flCol, 0xfffbeb);
       const fx = (Math.random() - 0.5) * 50;
       const fy = 10 + Math.random() * 38;
       const fz = (Math.random() - 0.5) * 38;
@@ -2186,6 +3399,194 @@
       });
     });
 
+    // ═══════════════════════════════════════════════════════════════════
+    // GUIDE GIRLS — Anime Characters on Each Island (Click for Details)
+    // ═══════════════════════════════════════════════════════════════════
+    const guideGirls = [];
+    const guideGirlAnimData = [];
+
+    // Station 0: Sakura — The Dreamer (by the cottage dock, waving)
+    const girl0 = createGuideGirl({
+      name: "Sakura", role: "The Dreamer",
+      dressColor: 0x06b6d4, hairColor: 0x451a03, accentColor: 0xf43f5e,
+      pose: "wave", scale: 0.85, stationIdx: 0,
+    });
+    girl0.group.position.set(4.6, 9.8, 6.8);
+    girl0.group.rotation.y = -0.3;
+    station0Group.add(girl0.group);
+    guideGirls.push(girl0);
+    clickTargets.push({ mesh: girl0.hitbox, stationIdx: 0, name: "✦ Meet Sakura — Click for Isle Dossier", type: "guide" });
+
+    // Sakura's flower garden & companion cat on the hero isle dock
+    const heroFlowers = createFlowerPatch(2.8, 16);
+    heroFlowers.position.set(4.2, 9.6, 6.4);
+    station0Group.add(heroFlowers);
+
+    const heroCat = createCat(0xf97316);
+    heroCat.group.position.set(2.4, 9.6, 6.2);
+    heroCat.group.rotation.y = 0.5;
+    station0Group.add(heroCat.group);
+    catAnimData.push(heroCat);
+
+    // Station 1: Hana — The Architect (reading near the carousel)
+    const girl1 = createGuideGirl({
+      name: "Hana", role: "The Architect",
+      dressColor: 0xf59e0b, hairColor: 0x1c1917, accentColor: 0x8b5cf6,
+      pose: "read", scale: 0.9, stationIdx: 1,
+    });
+    girl1.group.position.set(-8, 2.5, 8);
+    girl1.group.rotation.y = 0.6;
+    station1Group.add(girl1.group);
+    guideGirls.push(girl1);
+    clickTargets.push({ mesh: girl1.hitbox, stationIdx: 1, name: "✦ Meet Hana — Click for Observatory Dossier", type: "guide" });
+
+    // Station 2: Yuki — The Navigator (on the central bridge)
+    const girl2 = createGuideGirl({
+      name: "Yuki", role: "The Navigator",
+      dressColor: 0x10b981, hairColor: 0x78350f, accentColor: 0x06b6d4,
+      pose: "wave", scale: 0.85, stationIdx: 2,
+    });
+    girl2.group.position.set(-4, 9.2, 8);
+    girl2.group.rotation.y = 0.3;
+    station2Group.add(girl2.group);
+    guideGirls.push(girl2);
+    clickTargets.push({ mesh: girl2.hitbox, stationIdx: 2, name: "✦ Meet Yuki — Click for Archipelago Dossier", type: "guide" });
+
+    // Station 3: Hikari — The Astronomer (floating among the stars)
+    const girl3 = createGuideGirl({
+      name: "Hikari", role: "The Astronomer",
+      dressColor: 0x8b5cf6, hairColor: 0x0c0a09, accentColor: 0xfbbf24,
+      pose: "wave", scale: 1.0, stationIdx: 3,
+    });
+    girl3.group.position.set(0, 15, 0);
+    station3Group.add(girl3.group);
+    guideGirls.push(girl3);
+    floatingCrystals.push({ obj: girl3.group, baseY: 15, seed: 7.7 });
+    clickTargets.push({ mesh: girl3.hitbox, stationIdx: 3, name: "✦ Meet Hikari — Click for Constellation Dossier", type: "guide" });
+
+    // Station 4: Rei — The Portal Priestess (beside the arch)
+    const girl4 = createGuideGirl({
+      name: "Rei", role: "The Portal Priestess",
+      dressColor: 0xf43f5e, hairColor: 0x1e1b4b, accentColor: 0x38bdf8,
+      pose: "wave", scale: 0.9, stationIdx: 4,
+    });
+    girl4.group.position.set(16, 4.2, 10);
+    girl4.group.rotation.y = -0.5;
+    station4Group.add(girl4.group);
+    guideGirls.push(girl4);
+    clickTargets.push({ mesh: girl4.hitbox, stationIdx: 4, name: "✦ Meet Rei — Click for Portal Dossier", type: "guide" });
+
+    // Store for animation
+    guideGirls.forEach((g) => {
+      guideGirlAnimData.push({
+        waveArmPivot: g.waveArmPivot,
+        beaconDiamond: g.beaconDiamond,
+        pose: g.group.userData.pose,
+      });
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PORTAL GUARDIANS — Two Mighty Arcane Knights with Crossed Staffs
+    // ═══════════════════════════════════════════════════════════════════
+    const guardians = createPortalGuardians();
+    guardians.group.position.set(0, 0, 6);
+    station4Group.add(guardians.group);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SKY VESSELS — Hot Air Balloons & Fantasy Aeroplane
+    // ═══════════════════════════════════════════════════════════════════
+    const skyBalloons = [];
+
+    const balloon1 = createHotAirBalloon({ colorA: 0xef4444, colorB: 0xfef3c7, scale: 1.2, orbitRadius: 130, orbitSpeed: 0.0007, baseY: 68, phaseOffset: 0 });
+    scene.add(balloon1.group);
+    skyBalloons.push(balloon1);
+
+    const balloon2 = createHotAirBalloon({ colorA: 0x8b5cf6, colorB: 0xfbcfe8, scale: 1.0, orbitRadius: 155, orbitSpeed: 0.0005, baseY: 78, phaseOffset: 2.1 });
+    scene.add(balloon2.group);
+    skyBalloons.push(balloon2);
+
+    const balloon3 = createHotAirBalloon({ colorA: 0x059669, colorB: 0xecfccb, scale: 0.9, orbitRadius: 108, orbitSpeed: 0.0009, baseY: 55, phaseOffset: 4.2 });
+    scene.add(balloon3.group);
+    skyBalloons.push(balloon3);
+
+    const balloon4 = createHotAirBalloon({ colorA: 0xf59e0b, colorB: 0xfff7ed, scale: 1.1, orbitRadius: 170, orbitSpeed: 0.0006, baseY: 85, phaseOffset: 1.5 });
+    scene.add(balloon4.group);
+    skyBalloons.push(balloon4);
+
+    // Vintage Fantasy Aeroplane
+    const airplane = createFantasyAirplane({ scale: 1.4, orbitRadius: 150, speed: 0.0014, altitude: 58 });
+    scene.add(airplane.group);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CATS & FLOWER PATCHES — Living Color on Station 0 & 1
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Station 0: Colorful cats by the cottage
+    const catColors = [0xf97316, 0x1e1b4b, 0xfbbf24, 0x64748b];
+    [[-2, 11.0, 4], [4, 10.6, 8], [-8, 11.2, 0.5]].forEach((pos, i) => {
+      const cat = createCat(catColors[i % catColors.length]);
+      cat.group.position.set(pos[0], pos[1], pos[2]);
+      cat.group.rotation.y = Math.random() * Math.PI * 2;
+      cat.group.scale.set(1.5, 1.5, 1.5);
+      station0Group.add(cat.group);
+      catAnimData.push(cat);
+    });
+
+    // Station 1: Cats at the carnival
+    [[4, 2.5, 5], [-5, 2.5, -6]].forEach((pos, i) => {
+      const cat = createCat([0xfbbf24, 0x0f172a][i]);
+      cat.group.position.set(pos[0], pos[1], pos[2]);
+      cat.group.rotation.y = Math.random() * Math.PI * 2;
+      cat.group.scale.set(1.5, 1.5, 1.5);
+      station1Group.add(cat.group);
+      catAnimData.push(cat);
+    });
+
+    // Blooming Flower Patches
+    const flowers0 = createFlowerPatch(5.5, 24);
+    flowers0.position.set(3, 10.6, 3);
+    station0Group.add(flowers0);
+
+    const flowers1a = createFlowerPatch(6.0, 20);
+    flowers1a.position.set(6, 2.5, 5);
+    station1Group.add(flowers1a);
+
+    const flowers1b = createFlowerPatch(4.0, 14);
+    flowers1b.position.set(-12, 2.5, -5);
+    station1Group.add(flowers1b);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // EXTRA BUTTERFLIES — Fluttering on Stations 0 and 1
+    // ═══════════════════════════════════════════════════════════════════
+    const groundButterflies = [];
+    for (let gb = 0; gb < 6; gb++) {
+      const isStation0 = gb < 3;
+      const bfly = create3DButterfly([0xf472b6, 0xfbbf24, 0x38bdf8, 0xa855f7, 0xef4444, 0x10b981][gb], 1.2);
+      const parentGroup = isStation0 ? station0Group : station1Group;
+      parentGroup.add(bfly.group);
+      groundButterflies.push({
+        ...bfly,
+        parentGroup,
+        centerX: (Math.random() - 0.5) * 14,
+        centerZ: (Math.random() - 0.5) * 14,
+        baseY: isStation0 ? 13.5 : 5.5,
+        radiusX: 3 + Math.random() * 4,
+        radiusZ: 3 + Math.random() * 4,
+        flightSpeed: 0.003 + Math.random() * 0.002,
+        flapSpeed: 18 + Math.random() * 8,
+        offset: gb * 1.1,
+        seed: gb * 2.8,
+      });
+    }
+
+    // Store references for animation loop
+    window.__skyBalloons = skyBalloons;
+    window.__airplane = airplane;
+    window.__guideGirlAnimData = guideGirlAnimData;
+    window.__guardians = guardians;
+    window.__catAnimData = catAnimData;
+    window.__groundButterflies = groundButterflies;
+
     // Mark ready
     window.__WORLD_LOADED = true;
     document.documentElement.classList.add("world-ready");
@@ -2290,11 +3691,14 @@
       if (window.__navigateToStation) {
         window.__navigateToStation(hoveredTarget.stationIdx);
       }
+      if (window.__openIslandDossier) {
+        window.__openIslandDossier(hoveredTarget.stationIdx);
+      }
     }
   }
 
   window.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("button, a, input, .panel, #cmdk, .journey, .station-expand-pill")) return;
+    if (e.target.closest("button, a, input, .panel, #cmdk, .journey, .station-expand-pill, .island-dossier-modal, .station-banner-pill")) return;
     isDragging = true;
     dragMoved = false;
     prevPointer.x = e.clientX;
@@ -2313,7 +3717,7 @@
         const hint = document.getElementById("orbit-hint");
         if (hint) hint.classList.add("fade-out");
       }
-      targetOrbitYaw += dx * 0.0055;
+      targetOrbitYaw -= dx * 0.0055;
       targetOrbitPitch = Math.max(-0.75, Math.min(0.75, targetOrbitPitch - dy * 0.0045));
       prevPointer.x = e.clientX;
       prevPointer.y = e.clientY;
@@ -2332,9 +3736,39 @@
   });
 
   window.addEventListener("wheel", (e) => {
-    if (e.target.closest("#cmdk, .mission-row")) return;
-    targetZoomFactor = Math.max(0.6, Math.min(1.5, targetZoomFactor + e.deltaY * 0.0007));
-  }, { passive: true });
+    if (e.target.closest("#cmdk, .mission-row, .panel")) return;
+    if (e.ctrlKey) {
+      // Trackpad pinch-to-zoom: smooth and precise
+      e.preventDefault();
+      targetZoomFactor = Math.max(0.35, Math.min(3.0, targetZoomFactor + e.deltaY * 0.008));
+    } else if (document.body.classList.contains("cinema-mode") || isDragging) {
+      // In 3D Cinema Mode or dragging: wheel controls zoom without jumping stations
+      e.preventDefault();
+      targetZoomFactor = Math.max(0.35, Math.min(3.0, targetZoomFactor + e.deltaY * 0.0015));
+    } else {
+      targetZoomFactor = Math.max(0.35, Math.min(3.0, targetZoomFactor + e.deltaY * 0.0008));
+    }
+  }, { passive: false });
+
+  // Keyboard zoom & reset shortcuts (+ / - / 0)
+  window.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea, #cmdk")) return;
+    if (e.key === "+" || e.key === "=") {
+      window.__zoomIn();
+    } else if (e.key === "-" || e.key === "_") {
+      window.__zoomOut();
+    } else if (e.key === "0") {
+      window.__resetZoom();
+    }
+  });
+
+  // Global Zoom & Camera Navigation API
+  window.__getCurrentProgress = () => currentStationProgress;
+  window.__getZoomFactor = () => zoomFactor;
+  window.__setZoom = (z) => { targetZoomFactor = Math.max(0.35, Math.min(3.0, z)); };
+  window.__zoomIn = () => { targetZoomFactor = Math.max(0.35, targetZoomFactor * 0.80); };
+  window.__zoomOut = () => { targetZoomFactor = Math.min(3.0, targetZoomFactor * 1.25); };
+  window.__resetZoom = () => { targetZoomFactor = 1.0; targetOrbitYaw = 0; targetOrbitPitch = 0; };
 
   // Double click resets orbit view
   window.addEventListener("dblclick", (e) => {
@@ -2356,8 +3790,9 @@
     const elapsedTime = clock.getElapsedTime();
 
     // Smooth progress interpolation
-    if (STATIC && FORCED_STATION !== null) {
+    if (FORCED_STATION !== null) {
       currentStationProgress = FORCED_STATION;
+      targetStationProgress = FORCED_STATION;
     } else {
       currentStationProgress += (targetStationProgress - currentStationProgress) * 0.08;
     }
@@ -2491,12 +3926,12 @@
       item.obj.rotation.y += 0.012;
     });
 
-    // Animate Clear 3D Stars (rotation, refraction facets, core spin, halo ring)
+    // Animate Clear 3D Stars (rotation, refraction facets, core spin)
     celestialStars.forEach((star, idx) => {
       star.group.rotation.y += 0.009;
       star.group.rotation.x = Math.sin(elapsedTime * 1.2 + idx) * 0.15;
-      star.coreMesh.rotation.y -= 0.02;
-      star.ringMesh.rotation.z += 0.012;
+      if (star.coreMesh) star.coreMesh.rotation.y -= 0.02;
+      if (star.ringMesh) star.ringMesh.rotation.z += 0.012;
     });
 
     // Animate 3D Celestial Flowers (rotation and petal breathing/blooming)
@@ -2539,6 +3974,122 @@
 
     // Gentle cloud sea drift
     cloudSeaGroup.rotation.y = elapsedTime * 0.008;
+
+    // Animate Hot Air Balloons drifting across the sky
+    if (window.__skyBalloons) {
+      window.__skyBalloons.forEach((b) => {
+        const angle = elapsedTime * b.orbitSpeed * 60.0 + b.phaseOffset;
+        b.group.position.x = Math.cos(angle) * b.orbitRadius;
+        b.group.position.z = Math.sin(angle) * b.orbitRadius - 80;
+        b.group.position.y = b.baseY + Math.sin(elapsedTime * 0.8 + b.phaseOffset) * 4.5;
+        b.group.rotation.y = angle + Math.PI;
+        // Flickering burner flame
+        if (b.flameMesh) {
+          b.flameMesh.scale.setScalar(0.8 + Math.sin(elapsedTime * 12 + b.phaseOffset) * 0.3);
+        }
+      });
+    }
+
+    // Animate Fantasy Aeroplane flying in wide loops with banking & spinning propeller
+    if (window.__airplane) {
+      const ap = window.__airplane;
+      const aAngle = elapsedTime * ap.speed * 60.0;
+      ap.group.position.x = Math.cos(aAngle) * ap.orbitRadius;
+      ap.group.position.z = Math.sin(aAngle) * ap.orbitRadius - 90;
+      ap.group.position.y = ap.altitude + Math.sin(aAngle * 1.5) * 8;
+      // Face flight direction
+      ap.group.rotation.y = -aAngle + Math.PI / 2;
+      // Gentle banking on turns
+      ap.group.rotation.z = Math.sin(aAngle) * 0.18;
+      // High-speed propeller spin
+      ap.propPivot.rotation.z += 0.45;
+    }
+
+    // Animate Guide Girls (waving arm, floating beacon diamond)
+    if (window.__guideGirlAnimData) {
+      window.__guideGirlAnimData.forEach((g, idx) => {
+        // Gentle waving arm oscillation
+        if (g.pose === "wave" && g.waveArmPivot) {
+          g.waveArmPivot.rotation.z = -Math.PI * 0.65 + Math.sin(elapsedTime * 2.8 + idx * 1.5) * 0.18;
+        }
+        // Floating beacon diamond rotation and bob
+        if (g.beaconDiamond) {
+          g.beaconDiamond.rotation.y += 0.03;
+          g.beaconDiamond.position.y = 4.3 + Math.sin(elapsedTime * 2.5 + idx * 2) * 0.25;
+        }
+      });
+    }
+
+    // Animate Portal Guardians — Staffs crossed in neutral, raising high when traveler approaches!
+    if (window.__guardians) {
+      const gd = window.__guardians;
+      // When camera progress reaches station 4 (progress >= 3.2), smoothly raise staffs to open the arch
+      const portalOpenness = Math.max(0, Math.min(1, (currentStationProgress - 3.1) * 1.5));
+      const easedOpen = portalOpenness * portalOpenness * (3.0 - 2.0 * portalOpenness);
+      // Neutral crossed: ±0.72 rad (forming X barrier); opened: 0.0 rad (vertical / arched open)
+      gd.leftPivot.rotation.z = 0.72 * (1.0 - easedOpen);
+      gd.rightPivot.rotation.z = -0.72 * (1.0 - easedOpen);
+    }
+
+    // Animate Cats (curving tail swish)
+    if (window.__catAnimData) {
+      window.__catAnimData.forEach((cat, ci) => {
+        if (cat.tailPivot) {
+          cat.tailPivot.rotation.z = Math.sin(elapsedTime * 3.5 + ci * 1.8) * 0.3;
+        }
+      });
+    }
+
+    // Animate Ground Butterflies on Stations 0 & 1
+    if (window.__groundButterflies) {
+      window.__groundButterflies.forEach((b) => {
+        const flap = Math.sin(elapsedTime * b.flapSpeed + b.seed) * 0.9;
+        b.wingHolderL.rotation.y = flap;
+        b.wingHolderR.rotation.y = -flap;
+        const angle = elapsedTime * b.flightSpeed * 60.0 + b.offset;
+        const x = b.centerX + Math.cos(angle) * b.radiusX;
+        const z = b.centerZ + Math.sin(angle * 1.6) * b.radiusZ;
+        const y = b.baseY + Math.sin(elapsedTime * 2.8 + b.seed) * 1.2;
+        b.group.position.set(x, y, z);
+        const dx = -Math.sin(angle) * b.radiusX;
+        const dz = Math.cos(angle * 1.6) * b.radiusZ * 1.6;
+        b.group.rotation.y = Math.atan2(dx, dz) + Math.PI / 2;
+      });
+    }
+
+    // Animate Joyful Jumping Child across suspension bridge (Island 1 -> Island 2)
+    if (window.__jumpingChild) {
+      const jc = window.__jumpingChild;
+      const cycle = (elapsedTime * 0.42) % 1.0;
+      const t = cycle;
+      // Start: Island 1 (-22, 0, -5), End: Island 2 (-4, 5, 12)
+      const x = T.MathUtils.lerp(-20, -5, t);
+      const z = T.MathUtils.lerp(-4, 11, t);
+      const baseY = T.MathUtils.lerp(1.2, 5.8, t);
+      const arc = Math.sin(t * Math.PI) * 4.2;
+      jc.group.position.set(x, baseY + arc, z);
+      jc.group.lookAt(-4, 5.8, 12);
+      if (jc.legL && jc.legR) {
+        jc.legL.rotation.x = Math.sin(elapsedTime * 14) * 0.8;
+        jc.legR.rotation.x = -Math.sin(elapsedTime * 14) * 0.8;
+      }
+      if (jc.armL && jc.armR) {
+        jc.armL.rotation.x = Math.cos(elapsedTime * 14) * 0.7;
+        jc.armR.rotation.x = -Math.cos(elapsedTime * 14) * 0.7;
+      }
+    }
+
+    // Animate Bottom Sky Lanterns Gently Bobbing & Rising
+    if (window.__bottomSkyLanterns) {
+      window.__bottomSkyLanterns.forEach((lt) => {
+        const driftY = ((elapsedTime * 2.2 + lt.seed * 10) % 75);
+        lt.group.position.y = -105 + driftY;
+        lt.group.position.x = lt.baseX + Math.sin(elapsedTime * 0.8 + lt.seed) * 3.5;
+        lt.group.position.z = lt.baseZ + Math.cos(elapsedTime * 0.7 + lt.seed) * 3.5;
+        lt.group.rotation.y += 0.005;
+        lt.group.rotation.z = Math.sin(elapsedTime * 1.2 + lt.seed) * 0.06;
+      });
+    }
 
     // Render via composer or fallback renderer
     if (composer) {

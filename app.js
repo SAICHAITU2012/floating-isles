@@ -168,6 +168,8 @@
     }
     navLinks.forEach((a, i) => a.classList.toggle("active", i === nearest));
     journeyItems.forEach((li, i) => li.classList.toggle("near", i === nearest));
+    const stationPills = $$(".station-expand-pill");
+    stationPills.forEach((pill, i) => pill.classList.toggle("active", i === nearest));
   }
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
@@ -498,31 +500,68 @@
     }
   });
 
-  /* ── 8 · cinema mode, panel minimize & 3D navigation hooks ──── */
+  /* ── 8 · Island Dossier Modal & 3D Navigation Hooks ──── */
 
-  // Minimizable Panels & Station Expand Pills
+  const dossierBackdrop = $("#dossier-backdrop");
+
+  window.__openIslandDossier = (stationIdx) => {
+    // Close any currently open panels
+    $$(".panel").forEach((p) => p.classList.remove("modal-open"));
+    const targetPanel = $(`#panel-${stationIdx}`);
+    if (targetPanel) {
+      document.body.classList.add("has-modal-open");
+      targetPanel.classList.add("modal-open");
+      if (dossierBackdrop) dossierBackdrop.classList.add("active");
+      if (audioCtx && isAudioPlaying) {
+        const chord = CHORDS[stationIdx % CHORDS.length];
+        playPianoNote(chord.notes[1] * 1.5, audioCtx.currentTime, 1.8, 0.08);
+      }
+    }
+  };
+
+  window.__closeIslandDossier = () => {
+    document.body.classList.remove("has-modal-open");
+    $$(".panel").forEach((p) => p.classList.remove("modal-open"));
+    if (dossierBackdrop) dossierBackdrop.classList.remove("active");
+  };
+
+  // Close buttons inside panels
   $$(".panel-min-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const targetId = btn.dataset.target;
-      const panel = $(`#${targetId}`);
-      if (panel) {
-        panel.classList.add("minimized");
-        const pill = $(`[data-target="${targetId}"].station-expand-pill`);
-        if (pill) pill.hidden = false;
-      }
+      window.__closeIslandDossier();
     });
   });
 
+  // Clicking backdrop closes the dossier
+  if (dossierBackdrop) {
+    dossierBackdrop.addEventListener("click", window.__closeIslandDossier);
+  }
+
+  // Station expand pills open their respective dossier
   $$(".station-expand-pill").forEach((pill) => {
     pill.addEventListener("click", () => {
-      const targetId = pill.dataset.target;
-      const panel = $(`#${targetId}`);
-      if (panel) {
-        panel.classList.remove("minimized");
-        pill.hidden = true;
-      }
+      const stationIdx = parseInt(pill.dataset.station, 10);
+      window.__openIslandDossier(isNaN(stationIdx) ? 0 : stationIdx);
     });
+  });
+
+  // Escape key closes open dossier / D key toggles
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      window.__closeIslandDossier();
+    } else if (e.key === "d" || e.key === "D") {
+      if (!e.target.closest("input, textarea")) {
+        const currentModal = $(".panel.modal-open");
+        if (currentModal) {
+          window.__closeIslandDossier();
+        } else {
+          const activePill = $(".station-expand-pill.active");
+          const stationIdx = activePill ? parseInt(activePill.dataset.station, 10) : 0;
+          window.__openIslandDossier(isNaN(stationIdx) ? 0 : stationIdx);
+        }
+      }
+    }
   });
 
   // Cinema Mode (Pure 3D View without UI Clutter)
@@ -534,6 +573,7 @@
     document.body.classList.toggle("cinema-mode", active);
     if (cinemaToggle) cinemaToggle.classList.toggle("active", active);
     if (cinemaHud) cinemaHud.hidden = !active;
+    if (active) window.__closeIslandDossier();
   }
 
   if (cinemaToggle) {
@@ -553,15 +593,7 @@
     const targetId = ids[stationIdx];
     const el = document.getElementById(targetId);
     if (el) {
-      // If panel was minimized, restore it
-      const panel = $(`#panel-${stationIdx}`);
-      if (panel && panel.classList.contains("minimized")) {
-        panel.classList.remove("minimized");
-        const pill = $(`[data-target="panel-${stationIdx}"].station-expand-pill`);
-        if (pill) pill.hidden = true;
-      }
       el.scrollIntoView({ behavior: "smooth" });
-
       // Play a lovely chime note on visit
       if (audioCtx && isAudioPlaying) {
         const chord = CHORDS[stationIdx % CHORDS.length];
@@ -569,6 +601,201 @@
       }
     }
   };
+
+  /* ── 8.5 · 2D World Mini-Map & Zoom HUD Controller ─────────── */
+  const minimapCanvas = document.getElementById("minimap-canvas");
+  const minimapLoc = document.getElementById("minimap-loc");
+  const minimapCard = document.getElementById("world-minimap-card");
+  const minimapToggleBtn = document.getElementById("minimap-toggle-btn");
+
+  if (minimapToggleBtn && minimapCard) {
+    minimapToggleBtn.addEventListener("click", () => {
+      minimapCard.classList.toggle("minimized");
+      minimapToggleBtn.textContent = minimapCard.classList.contains("minimized") ? "+" : "_";
+    });
+  }
+
+  const MAP_STATIONS = [
+    { idx: 0, name: "00 · The Hero Isle",        short: "00 HERO",       color: "#10b981", icon: "🏝️", x: 42,  y: 110, id: "prologue" },
+    { idx: 1, name: "01 · Celestial Carnival",   short: "01 CARNIVAL",   color: "#f59e0b", icon: "🎡", x: 180, y: 46,  id: "file" },
+    { idx: 2, name: "02 · Shipped Archipelago",  short: "02 ARCHIPELAGO", color: "#06b6d4", icon: "🌉", x: 84,  y: 72,  id: "missions" },
+    { idx: 3, name: "03 · Starlight Constellation", short: "03 STARS",   color: "#a855f7", icon: "✨", x: 44,  y: 34,  id: "techniques" },
+    { idx: 4, name: "04 · Cosmic Portal",        short: "04 PORTAL",     color: "#38bdf8", icon: "⛩️", x: 122, y: 122, id: "summon" },
+  ];
+
+  if (minimapCanvas) {
+    const mctx = minimapCanvas.getContext("2d");
+
+    // Click on island node to fly to station
+    minimapCanvas.addEventListener("click", (e) => {
+      const rect = minimapCanvas.getBoundingClientRect();
+      const scaleX = minimapCanvas.width / rect.width;
+      const scaleY = minimapCanvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      for (const st of MAP_STATIONS) {
+        const d = Math.hypot(mx - st.x, my - st.y);
+        if (d < 18) {
+          window.__navigateToStation(st.idx);
+          break;
+        }
+      }
+    });
+
+    // Hover cursor feedback
+    minimapCanvas.addEventListener("mousemove", (e) => {
+      const rect = minimapCanvas.getBoundingClientRect();
+      const scaleX = minimapCanvas.width / rect.width;
+      const scaleY = minimapCanvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      let hovered = false;
+      for (const st of MAP_STATIONS) {
+        if (Math.hypot(mx - st.x, my - st.y) < 18) {
+          hovered = true;
+          minimapCanvas.title = `Fly to ${st.name}`;
+          break;
+        }
+      }
+      minimapCanvas.style.cursor = hovered ? "pointer" : "crosshair";
+    });
+
+    // Mini-map animation loop
+    function renderMinimap(now) {
+      requestAnimationFrame(renderMinimap);
+
+      const w = minimapCanvas.width;
+      const h = minimapCanvas.height;
+
+      // Background starry night gradient
+      const bgGrad = mctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 1.4);
+      bgGrad.addColorStop(0, "rgba(23, 37, 84, 0.95)");
+      bgGrad.addColorStop(1, "rgba(8, 12, 26, 0.98)");
+      mctx.fillStyle = bgGrad;
+      mctx.fillRect(0, 0, w, h);
+
+      // Delicate starry grid lines
+      mctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
+      mctx.lineWidth = 1;
+      for (let gx = 20; gx < w; gx += 30) {
+        mctx.beginPath(); mctx.moveTo(gx, 0); mctx.lineTo(gx, h); mctx.stroke();
+      }
+      for (let gy = 20; gy < h; gy += 30) {
+        mctx.beginPath(); mctx.moveTo(0, gy); mctx.lineTo(w, gy); mctx.stroke();
+      }
+
+      // Golden flight route connecting stations in sequence
+      mctx.beginPath();
+      mctx.strokeStyle = "rgba(251, 191, 36, 0.4)";
+      mctx.lineWidth = 1.5;
+      mctx.setLineDash([4, 4]);
+      for (let i = 0; i < MAP_STATIONS.length; i++) {
+        const pt = MAP_STATIONS[i];
+        if (i === 0) mctx.moveTo(pt.x, pt.y);
+        else mctx.lineTo(pt.x, pt.y);
+      }
+      mctx.stroke();
+      mctx.setLineDash([]);
+
+      // Draw Station Nodes
+      MAP_STATIONS.forEach((st) => {
+        // Glowing halo
+        const haloGrad = mctx.createRadialGradient(st.x, st.y, 2, st.x, st.y, 14);
+        haloGrad.addColorStop(0, st.color);
+        haloGrad.addColorStop(1, "transparent");
+        mctx.fillStyle = haloGrad;
+        mctx.beginPath();
+        mctx.arc(st.x, st.y, 14, 0, Math.PI * 2);
+        mctx.fill();
+
+        // Node center
+        mctx.fillStyle = st.color;
+        mctx.beginPath();
+        mctx.arc(st.x, st.y, 5, 0, Math.PI * 2);
+        mctx.fill();
+
+        mctx.strokeStyle = "#ffffff";
+        mctx.lineWidth = 1.2;
+        mctx.stroke();
+
+        // Node label
+        mctx.fillStyle = "rgba(248, 250, 252, 0.85)";
+        mctx.font = "8px monospace";
+        mctx.textAlign = "center";
+        mctx.fillText(st.short, st.x, st.y + 13);
+      });
+
+      // Animated "YOU ARE HERE" Beacon Marker
+      const prog = typeof window.__getCurrentProgress === "function" ? window.__getCurrentProgress() : 0;
+      const stIdx = Math.min(Math.floor(prog), MAP_STATIONS.length - 2);
+      const frac = Math.max(0, Math.min(1, prog - stIdx));
+      const sA = MAP_STATIONS[stIdx];
+      const sB = MAP_STATIONS[stIdx + 1];
+
+      const curX = sA.x + (sB.x - sA.x) * frac;
+      const curY = sA.y + (sB.y - sA.y) * frac;
+
+      // Pulsing ripple ring
+      const pulseTime = (now || 0) * 0.003;
+      const pulseR = 6 + (pulseTime % 1.0) * 12;
+      const pulseAlpha = Math.max(0, 1.0 - (pulseTime % 1.0));
+
+      mctx.strokeStyle = `rgba(236, 72, 153, ${pulseAlpha})`;
+      mctx.lineWidth = 1.8;
+      mctx.beginPath();
+      mctx.arc(curX, curY, pulseR, 0, Math.PI * 2);
+      mctx.stroke();
+
+      // Sharp glowing traveler dot
+      mctx.fillStyle = "#f43f5e";
+      mctx.beginPath();
+      mctx.arc(curX, curY, 4, 0, Math.PI * 2);
+      mctx.fill();
+      mctx.strokeStyle = "#ffffff";
+      mctx.lineWidth = 1.5;
+      mctx.stroke();
+
+      // Current Station Name in Footer
+      const curStation = MAP_STATIONS[Math.min(4, Math.round(prog))];
+      if (minimapLoc && curStation) {
+        minimapLoc.textContent = curStation.name;
+      }
+    }
+    requestAnimationFrame(renderMinimap);
+  }
+
+  // ── Zoom Controls HUD Interaction ──
+  const zoomInBtn = document.getElementById("zoom-in-btn");
+  const zoomOutBtn = document.getElementById("zoom-out-btn");
+  const zoomResetBtn = document.getElementById("zoom-reset-btn");
+  const zoomLevelText = document.getElementById("zoom-level-text");
+
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      if (window.__zoomIn) window.__zoomIn();
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      if (window.__zoomOut) window.__zoomOut();
+    });
+  }
+  if (zoomResetBtn) {
+    zoomResetBtn.addEventListener("click", () => {
+      if (window.__resetZoom) window.__resetZoom();
+    });
+  }
+
+  // Update zoom level text indicator every 100ms
+  setInterval(() => {
+    if (zoomLevelText && typeof window.__getZoomFactor === "function") {
+      const zf = window.__getZoomFactor();
+      const pct = Math.round((1 / zf) * 100);
+      zoomLevelText.textContent = `${pct}%`;
+    }
+  }, 100);
 
   /* ── 9 · misc + QA hooks ────────────────────────────────────── */
 
