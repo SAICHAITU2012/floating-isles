@@ -1,9 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   S. SADHASRI — THE FLOATING REALM (v10.0 "GHIBLI ENCHANTED UNIVERSE")
+   S. SADHASRI — THE FLOATING REALM (v11.0 "THE LIVING SKY")
    world.js — Production-grade stylized 3D fantasy floating world.
    Real CC0 / CC-BY GLTF/GLB models · Studio Ghibli cel shaders ·
-   Foliage cloud normals · Procedural anime sky dome · Billowing cloud sea ·
-   Multi-tiered cascading waterfall with mist & rainbow · Animated soaring birds ·
+   Foliage cloud normals · Procedural anime sky dome with journey arc ·
+   THE LIVING SKY: one continuous day per flight — morning isle, festival
+   noon, golden-hour archipelago, twilight constellation (dome star field
+   fades in), mystic portal night. Sun, fog, bloom, exposure, shadows and
+   the rainbow all ride the journey. · Cinematic grade pass (saturation,
+   S-curve, vignette) · Adaptive DPR quality ladder ·
    5 cinematic stations: Isle, Observatory, Archipelago, Constellation, Portal ·
    UnrealBloom post-processing & smooth spline camera choreography.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -58,18 +62,64 @@
 
   // Post-Processing Pipeline
   let composer = null;
+  let bloomPass = null;
+  let gradePass = null;
   if (typeof T.EffectComposer !== "undefined" && typeof T.RenderPass !== "undefined" && typeof T.UnrealBloomPass !== "undefined") {
     composer = new T.EffectComposer(renderer);
     const renderPass = new T.RenderPass(scene, camera);
     composer.addPass(renderPass);
 
-    const bloomPass = new T.UnrealBloomPass(
+    bloomPass = new T.UnrealBloomPass(
       new T.Vector2(window.innerWidth, window.innerHeight),
-      0.22, // subtle crisp bloom
+      0.22, // subtle crisp bloom (journey arc raises this at night)
       0.25, // bloom radius
-      0.95  // threshold: only highly emissive elements (runes/crystals) glow
+      0.9   // threshold: emissive elements (runes/crystals/stars) glow
     );
     composer.addPass(bloomPass);
+
+    // Cinematic finish: saturation lift + gentle S-curve contrast + vignette.
+    // Cures the washed-out pastel look without repainting every material.
+    if (typeof T.ShaderPass !== "undefined") {
+      gradePass = new T.ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          uSat: { value: 1.18 },
+          uCon: { value: 1.07 },
+          uVig: { value: 0.26 },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float uSat;
+          uniform float uCon;
+          uniform float uVig;
+          varying vec2 vUv;
+          void main() {
+            vec4 c = texture2D(tDiffuse, vUv);
+
+            // Saturation (luma-preserving)
+            float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+            c.rgb = mix(vec3(l), c.rgb, uSat);
+
+            // Gentle filmic S-curve
+            c.rgb = clamp((c.rgb - 0.5) * uCon + 0.5, 0.0, 1.0);
+
+            // Soft elliptical vignette
+            vec2 d = (vUv - 0.5) * vec2(1.15, 1.0);
+            c.rgb *= 1.0 - uVig * smoothstep(0.35, 0.72, dot(d, d) * 1.6);
+
+            gl_FragColor = c;
+          }
+        `,
+      });
+      composer.addPass(gradePass);
+    }
   }
 
   /* ── 2. GHIBLI TOON / CEL SHADER MATERIAL PIPELINE ─────────────────── */
@@ -197,6 +247,7 @@
   sunLight.shadow.camera.bottom = -60;
   sunLight.shadow.bias = -0.0004;
   scene.add(sunLight);
+  scene.add(sunLight.target); // target rides the journey so shadows stay crisp at EVERY station
 
   // Soft Cerulean Sky Ambient (Brings lush saturation to shadows)
   const hemiLight = new T.HemisphereLight(0x7dc5ff, 0x5a9062, 0.75);
@@ -223,6 +274,8 @@
       uFogColor: { value: new T.Color(0x60a5fa) },       // Fog blend color
       uSunDir: { value: new T.Vector3(80, 140, 60).normalize() },
       uSunColor: { value: new T.Color(0xfffaf0) },
+      uStars: { value: 0.0 },                            // Star field intensity (night stations)
+      uTime: { value: 0 },                               // For star twinkle
     },
     vertexShader: `
       varying vec3 vWorldPosition;
@@ -239,28 +292,53 @@
       uniform vec3 uFogColor;
       uniform vec3 uSunDir;
       uniform vec3 uSunColor;
+      uniform float uStars;
+      uniform float uTime;
       varying vec3 vWorldPosition;
+
+      // Cheap 3D hash for stable per-cell star seeds
+      float hash3(vec3 p) {
+        p = fract(p * 0.3183099 + 0.1);
+        p *= 17.0;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
 
       void main() {
         vec3 dir = normalize(vWorldPosition);
         float y = dir.y;
 
-        // Multi-stop vertical anime gradient
+        // Multi-stop vertical anime gradient — thin horizon band so the
+        // deep sky colour (and the stars) own the upper dome
         vec3 col;
-        if (y > 0.35) {
-          col = mix(uSkyColor, uZenithColor, smoothstep(0.35, 0.95, y));
+        if (y > 0.12) {
+          col = mix(uSkyColor, uZenithColor, smoothstep(0.12, 0.85, y));
         } else if (y > 0.0) {
-          col = mix(uHorizonColor, uSkyColor, smoothstep(0.0, 0.35, y));
+          col = mix(uHorizonColor, uSkyColor, smoothstep(0.0, 0.12, y));
         } else {
           col = mix(uHorizonColor, uFogColor, clamp(-y * 3.0, 0.0, 1.0));
         }
 
-        // Sun disc and corona flare
+        // Sun / moon disc and corona flare
         float sunDot = max(dot(dir, uSunDir), 0.0);
         float sunDisc = smoothstep(0.9985, 0.9995, sunDot);
         float sunGlow = pow(sunDot, 18.0) * 0.45 + pow(sunDot, 6.0) * 0.15;
 
         col += uSunColor * (sunDisc * 2.2 + sunGlow);
+
+        // Procedural star field — round soft points on the dome, brighter
+        // toward zenith, gentle per-star twinkle; fades in with uStars
+        if (uStars > 0.001) {
+          vec3 sp = dir * 230.0;
+          vec3 cell = floor(sp);
+          float h = hash3(cell);
+          float star = step(0.9965, h);
+          vec3 f = fract(sp) - 0.5;            // local coords inside the cell
+          float round = smoothstep(0.42, 0.08, length(f));
+          float twinkle = 0.55 + 0.45 * sin(uTime * 1.7 + h * 71.3);
+          float altFade = smoothstep(0.0, 0.18, y); // stars live above the horizon glow
+          col += vec3(0.86, 0.92, 1.0) * star * round * twinkle * altFade * uStars * 1.6;
+        }
+
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -477,6 +555,10 @@
     opacity: 0.92,
     depthWrite: false,
     side: T.DoubleSide,
+    uniforms: {
+      uAlpha: { value: 1.0 },   // journey fade — dissolves into a faint moonbow at night
+      uNight: { value: 0.0 },   // 0 = day spectral colors, 1 = soft silver moonbow
+    },
     vertexShader: `
       varying vec3 vLocalPos;
       void main() {
@@ -486,6 +568,8 @@
     `,
     fragmentShader: `
       varying vec3 vLocalPos;
+      uniform float uAlpha;
+      uniform float uNight;
       
       // Authentic 7-stripe spectral color distribution
       vec3 getRainbow(float t) {
@@ -519,6 +603,10 @@
         float r = length(vLocalPos.xy);
         float t = clamp((r - 95.0) / (125.0 - 95.0), 0.0, 1.0);
         vec3 col = getRainbow(t);
+
+        // Night: wash the spectral bands toward a pale silver moonbow
+        float lum = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(col, vec3(lum) * vec3(0.78, 0.86, 1.05) + vec3(0.10, 0.12, 0.18), uNight);
         
         // Soft edge feathering across inner and outer ring boundaries
         float edgeRad = sin(t * 3.14159265);
@@ -527,7 +615,7 @@
         // Soft fade into horizon clouds at the arch bases (vLocalPos.y near 0)
         float edgeArc = smoothstep(0.0, 18.0, vLocalPos.y);
         
-        float alpha = edgeRad * edgeArc * 0.94;
+        float alpha = edgeRad * edgeArc * 0.94 * uAlpha;
         gl_FragColor = vec4(col, alpha);
       }
     `,
@@ -536,6 +624,114 @@
   rainbow.position.set(12, -8, -125);
   rainbow.rotation.set(0.14, 0.18, -0.05);
   scene.add(rainbow);
+
+  /* ── 4.5 · THE JOURNEY SKY — one continuous day, dusk & starlit night ──
+     The flight across the isles is also a flight through a whole day:
+     morning isle → festival noon → golden-hour archipelago →
+     twilight constellation (the stars come out) → mystic portal night.
+     Every keyframe lerps sky, fog, sun, hemisphere fill, bloom, exposure,
+     the star field, and rides the shadow frustum to the active station. */
+  const SKY_JOURNEY = [
+    { // 0 · ISLE — crisp bright morning
+      zenith: 0x0c4a6e, sky: 0x0ea5e9, horizon: 0x8ed9f7, fog: 0xa8def6,
+      sunCol: 0xfff3d6, sunInt: 1.42, sunPos: [80, 140, 60], sunTarget: [4, 9, 0],
+      hemiSky: 0x7dc5ff, hemiGnd: 0x5a9062, hemiInt: 0.82,
+      bounce: 0.38, exposure: 1.0, bloom: 0.24, stars: 0.0,
+      rainbowA: 1.0, rainbowN: 0.0,
+    },
+    { // 1 · CARNIVAL — radiant festival noon
+      zenith: 0x0369a1, sky: 0x0894d3, horizon: 0x7dd3fc, fog: 0x93cdf2,
+      sunCol: 0xfffbe8, sunInt: 1.5, sunPos: [130, 170, -40], sunTarget: [240, 25, -160],
+      hemiSky: 0x86ccff, hemiGnd: 0x62a06a, hemiInt: 0.85,
+      bounce: 0.35, exposure: 1.0, bloom: 0.22, stars: 0.0,
+      rainbowA: 0.85, rainbowN: 0.0,
+    },
+    { // 2 · ARCHIPELAGO — golden hour over the water (sun rides the camera side so isles glow warm, not silhouette)
+      zenith: 0x1e4f9c, sky: 0x4a8fd4, horizon: 0xffd9a3, fog: 0xeec488,
+      sunCol: 0xffc98a, sunInt: 1.32, sunPos: [-330, 95, 60], sunTarget: [-220, 20, -140],
+      hemiSky: 0x9fb8e8, hemiGnd: 0x8a6b4a, hemiInt: 0.72,
+      bounce: 0.3, exposure: 0.99, bloom: 0.3, stars: 0.0,
+      rainbowA: 0.45, rainbowN: 0.15,
+    },
+    { // 3 · CONSTELLATION — twilight, the first stars
+      zenith: 0x0b1026, sky: 0x171a3a, horizon: 0xc07a50, fog: 0x3b2f63,
+      sunCol: 0xd6e4ff, sunInt: 0.55, sunPos: [60, 130, -110], sunTarget: [-120, 80, -380],
+      hemiSky: 0x2a3358, hemiGnd: 0x101423, hemiInt: 0.52,
+      bounce: 0.16, exposure: 0.94, bloom: 0.56, stars: 1.0,
+      rainbowA: 0.14, rainbowN: 1.0,
+    },
+    { // 4 · PORTAL — mystic night, the gate is lit (stone kept readable by moonlight)
+      zenith: 0x05070f, sky: 0x0d1226, horizon: 0x2b2a5e, fog: 0x191b3a,
+      sunCol: 0xc7dcf8, sunInt: 0.6, sunPos: [-40, 120, -80], sunTarget: [0, 40, -560],
+      hemiSky: 0x30396b, hemiGnd: 0x10142a, hemiInt: 0.64,
+      bounce: 0.18, exposure: 0.95, bloom: 0.72, stars: 1.0,
+      rainbowA: 0.0, rainbowN: 1.0,
+    },
+  ];
+
+  // Scratch objects for the per-frame lerp (no allocation in the loop)
+  const _skyA = new T.Color(), _skyB = new T.Color(), _lerped = new T.Color();
+  const _sunPos = new T.Vector3(), _sunTgt = new T.Vector3();
+  const _posA = new T.Vector3(), _posB = new T.Vector3();
+  const _tgtA = new T.Vector3(), _tgtB = new T.Vector3();
+
+  function lerpColor(prop, key, t) {
+    _skyA.setHex(SKY_JOURNEY[prop][key]);
+    _skyB.setHex(SKY_JOURNEY[prop + 1][key]);
+    _lerped.lerpColors(_skyA, _skyB, t);
+    return _lerped;
+  }
+  function lerpNum(prop, key, t) {
+    return SKY_JOURNEY[prop][key] + (SKY_JOURNEY[prop + 1][key] - SKY_JOURNEY[prop][key]) * t;
+  }
+
+  let journeyIdx = 0, journeyT = 0;
+  function applyJourneySky(stationProgress) {
+    const maxIdx = SKY_JOURNEY.length - 2; // interpolate between keyframes
+    journeyIdx = Math.min(Math.max(Math.floor(stationProgress), 0), maxIdx);
+    journeyT = Math.min(Math.max(stationProgress - journeyIdx, 0), 1);
+
+    const kfA = SKY_JOURNEY[journeyIdx], kfB = SKY_JOURNEY[journeyIdx + 1];
+
+    // Sky dome gradient
+    skyMat.uniforms.uZenithColor.value.copy(lerpColor(journeyIdx, "zenith", journeyT));
+    skyMat.uniforms.uSkyColor.value.copy(lerpColor(journeyIdx, "sky", journeyT));
+    skyMat.uniforms.uHorizonColor.value.copy(lerpColor(journeyIdx, "horizon", journeyT));
+    skyMat.uniforms.uFogColor.value.copy(lerpColor(journeyIdx, "fog", journeyT));
+    skyMat.uniforms.uStars.value = lerpNum(journeyIdx, "stars", journeyT);
+
+    // Sun / moon — colour, strength and riding position
+    skyMat.uniforms.uSunColor.value.copy(lerpColor(journeyIdx, "sunCol", journeyT));
+    sunLight.color.copy(lerpColor(journeyIdx, "sunCol", journeyT));
+    sunLight.intensity = lerpNum(journeyIdx, "sunInt", journeyT);
+    _posA.fromArray(kfA.sunPos); _posB.fromArray(kfB.sunPos);
+    _sunPos.lerpVectors(_posA, _posB, journeyT);
+    sunLight.position.copy(_sunPos);
+    _tgtA.fromArray(kfA.sunTarget); _tgtB.fromArray(kfB.sunTarget);
+    _sunTgt.lerpVectors(_tgtA, _tgtB, journeyT);
+    sunLight.target.position.copy(_sunTgt);
+    sunLight.target.updateMatrixWorld();
+    sunLight.shadow.camera.updateProjectionMatrix();
+
+    // Ambient sky bounce
+    hemiLight.color.copy(lerpColor(journeyIdx, "hemiSky", journeyT));
+    hemiLight.groundColor.copy(lerpColor(journeyIdx, "hemiGnd", journeyT));
+    hemiLight.intensity = lerpNum(journeyIdx, "hemiInt", journeyT);
+    bounceLight.intensity = lerpNum(journeyIdx, "bounce", journeyT);
+
+    // Fog, backdrop, exposure, bloom
+    const fogCol = lerpColor(journeyIdx, "fog", journeyT);
+    scene.fog.color.copy(fogCol);
+    scene.background.copy(fogCol);
+    renderer.setClearColor(fogCol, 1.0);
+    renderer.toneMappingExposure = lerpNum(journeyIdx, "exposure", journeyT);
+    if (bloomPass) bloomPass.strength = lerpNum(journeyIdx, "bloom", journeyT);
+
+    // Rainbow dissolves into a faint moonbow after sundown
+    rainbowMat.uniforms.uAlpha.value = lerpNum(journeyIdx, "rainbowA", journeyT);
+    rainbowMat.uniforms.uNight.value = lerpNum(journeyIdx, "rainbowN", journeyT);
+  }
+  applyJourneySky(0);
 
   /* ── 5. ASSET LOADER & 3D FANTASY WORLD GENERATION ─────────────────── */
 
@@ -3818,10 +4014,10 @@
   const CAMERA_WAYPOINTS = [
     // 00 — ISLE: Wide establishing view framing hero island, cottage, grand oak & waterfall
     { pos: new T.Vector3(-18, 28, 62),   target: new T.Vector3(4, 9, 0) },
-    // 01 — OBSERVATORY: Panoramic view framing the celestial carnival, ferris wheel & observatory spire
-    { pos: new T.Vector3(212, 53, -105), target: new T.Vector3(244, 27, -160) },
-    // 02 — ARCHIPELAGO: Panoramic downward view across the chain of islands & bridges
-    { pos: new T.Vector3(-242, 46, -85), target: new T.Vector3(-216, 22, -140) },
+    // 01 — OBSERVATORY: High & far enough back that the whole ferris wheel fits the frame
+    { pos: new T.Vector3(184, 78, -56), target: new T.Vector3(246, 28, -162) },
+    // 02 — ARCHIPELAGO: Low golden-hour panorama across the suspension-bridge chain
+    { pos: new T.Vector3(-274, 36, -74), target: new T.Vector3(-210, 16, -142) },
     // 03 — CONSTELLATION: Immersive starlight glide straight through the glowing crystals
     { pos: new T.Vector3(-120, 115, -315), target: new T.Vector3(-120, 108, -380) },
     // 04 — PORTAL: Elevated eye-level view directly into the stone rune gate and vortex
@@ -4040,10 +4236,53 @@
   const currentPos = new T.Vector3();
   const currentLookAt = new T.Vector3();
 
+  /* ── ADAPTIVE DPR — measured fps windows, stepped resolution ladder ──
+     Every 2s: median frame ms decides a single 0.25 rung. Down freely,
+     up only after an 8s cooldown so it can never oscillate. Integrated
+     GPUs quietly get resolution back when idle; nobody sees flicker. */
+  const ADAPT = {
+    cap: Math.min(window.devicePixelRatio || 1, MOBILE() ? 1.5 : 2.0),
+    floor: 1.0,
+    cur: 0, winStart: 0, frameMs: [], lastChange: 0,
+  };
+  ADAPT.cur = ADAPT.cap;
+  function setDpr(v) {
+    v = Math.round(v * 4) / 4;
+    if (v === ADAPT.cur) return;
+    ADAPT.cur = v;
+    renderer.setPixelRatio(v);
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  }
+  setDpr(ADAPT.cur);
+  window.__worldQuality = () => ADAPT.cur;
+
+  function adaptiveDprTick(nowMs, frameDeltaMs) {
+    if (frameDeltaMs > 0 && frameDeltaMs < 250) { // ignore tab-restore spikes
+      ADAPT.frameMs.push(frameDeltaMs);
+    }
+    if (!ADAPT.winStart) ADAPT.winStart = nowMs;
+    if (nowMs - ADAPT.winStart < 2000 || ADAPT.frameMs.length < 20) return;
+
+    const sorted = ADAPT.frameMs.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    ADAPT.frameMs.length = 0;
+    ADAPT.winStart = nowMs;
+
+    if (median > 23 && ADAPT.cur > ADAPT.floor) {
+      setDpr(Math.max(ADAPT.floor, ADAPT.cur - 0.25));
+      ADAPT.lastChange = nowMs;
+    } else if (median < 13 && ADAPT.cur < ADAPT.cap && nowMs - ADAPT.lastChange > 8000) {
+      setDpr(Math.min(ADAPT.cap, ADAPT.cur + 0.25));
+      ADAPT.lastChange = nowMs;
+    }
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
     const elapsedTime = clock.getElapsedTime();
+
+    adaptiveDprTick(performance.now(), delta * 1000);
 
     // Smooth progress interpolation
     if (FORCED_STATION !== null) {
@@ -4052,6 +4291,11 @@
     } else {
       currentStationProgress += (targetStationProgress - currentStationProgress) * 0.08;
     }
+
+    // The sky, sun & atmosphere travel with you: morning → noon → golden
+    // hour → starlight → portal night
+    applyJourneySky(currentStationProgress);
+    skyMat.uniforms.uTime.value = elapsedTime;
 
     // Interpolate camera position & target between waypoints
     const stationIdx = Math.min(Math.floor(currentStationProgress), CAMERA_WAYPOINTS.length - 2);
