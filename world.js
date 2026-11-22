@@ -938,15 +938,15 @@
     // Clear, light-transmitting refractive crystal material revealing internal depth
     const glassMat = new T.MeshPhysicalMaterial({
       color: color,
-      transmission: 0.88,
-      opacity: 0.72,
+      transmission: 0.82,
+      opacity: 0.82,
       transparent: true,
       roughness: 0.08,
-      reflectivity: 0.85,
+      reflectivity: 0.9,
       clearcoat: 1.0,
       clearcoatRoughness: 0.08,
       emissive: new T.Color(color),
-      emissiveIntensity: 0.45,
+      emissiveIntensity: 0.95,
       side: T.DoubleSide,
       flatShading: true,
       depthWrite: false,
@@ -958,20 +958,20 @@
     // Visible internal and external geometric facet edges
     const edgesGeo = new T.EdgesGeometry(starGeo, 24);
     const edgesMat = new T.LineBasicMaterial({
-      color: 0xffffff,
+      color: color,
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.95,
       blending: T.AdditiveBlending,
     });
     const edgesMesh = new T.LineSegments(edgesGeo, edgesMat);
     starGroup.add(edgesMesh);
 
     // Internal glowing starlight diamond inside the transparent star
-    const coreGeo = new T.OctahedronGeometry(coreRadius * 0.55, 0);
+    const coreGeo = new T.OctahedronGeometry(coreRadius * 0.65, 0);
     const coreMat = new T.MeshStandardMaterial({
       color: color,
       emissive: color,
-      emissiveIntensity: 3.2,
+      emissiveIntensity: 4.5,
       roughness: 0.1,
       metalness: 0.8,
     });
@@ -979,11 +979,11 @@
     starGroup.add(coreMesh);
 
     // Glowing orbital halo ring
-    const ringGeo = new T.TorusGeometry(spikeRadius * 0.95, 0.05, 6, 32);
+    const ringGeo = new T.TorusGeometry(spikeRadius * 0.95, 0.08, 6, 32);
     const ringMat = new T.MeshBasicMaterial({
       color: color,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.85,
       blending: T.AdditiveBlending,
     });
     const ringMesh = new T.Mesh(ringGeo, ringMat);
@@ -1014,30 +1014,56 @@
     const petalMat = new T.MeshStandardMaterial({
       color: petalColor,
       emissive: petalColor,
-      emissiveIntensity: 0.65,
+      emissiveIntensity: 1.1,
       roughness: 0.15,
       metalness: 0.2,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       side: T.DoubleSide,
     });
 
+    // Outer Petal Ring
     for (let p = 0; p < numPetals; p++) {
       const angle = (p / numPetals) * Math.PI * 2;
       const petalHolder = new T.Group();
       petalHolder.rotation.y = angle;
 
       const petalGeo = new T.BufferGeometry();
-      const w = 0.65;
-      const l = 1.6;
+      const w = 0.75;
+      const l = 1.8;
       petalGeo.setAttribute("position", new T.Float32BufferAttribute([
-        0, 0, 0,        w * 0.5, 0.22, l * 0.5,   0, 0.45, l,
-        0, 0, 0,        0, 0.45, l,               -w * 0.5, 0.22, l * 0.5,
+        0, 0, 0,        w * 0.5, 0.25, l * 0.5,   0, 0.5, l,
+        0, 0, 0,        0, 0.5, l,               -w * 0.5, 0.25, l * 0.5,
       ], 3));
       petalGeo.computeVertexNormals();
 
       const petalMesh = new T.Mesh(petalGeo, petalMat);
-      petalMesh.rotation.x = -0.32;
+      petalMesh.rotation.x = -0.36;
+      petalHolder.add(petalMesh);
+      flowerGroup.add(petalHolder);
+      petals.push(petalMesh);
+    }
+
+    // Inner Petal Ring (Offset for double-blossom)
+    for (let p = 0; p < numPetals; p++) {
+      const angle = (p / numPetals) * Math.PI * 2 + Math.PI / 6;
+      const petalHolder = new T.Group();
+      petalHolder.rotation.y = angle;
+      petalHolder.position.y = 0.15;
+
+      const petalGeo = new T.BufferGeometry();
+      const w = 0.55;
+      const l = 1.35;
+      petalGeo.setAttribute("position", new T.Float32BufferAttribute([
+        0, 0, 0,        w * 0.5, 0.3, l * 0.5,   0, 0.6, l,
+        0, 0, 0,        0, 0.6, l,              -w * 0.5, 0.3, l * 0.5,
+      ], 3));
+      petalGeo.computeVertexNormals();
+
+      const innerPetalMat = petalMat.clone();
+      innerPetalMat.emissiveIntensity = 1.4;
+      const petalMesh = new T.Mesh(petalGeo, innerPetalMat);
+      petalMesh.rotation.x = -0.22;
       petalHolder.add(petalMesh);
       flowerGroup.add(petalHolder);
       petals.push(petalMesh);
@@ -1089,6 +1115,107 @@
     birdGroup.add(wingR);
 
     return { group: birdGroup, wingL, wingR };
+  }
+
+  /**
+   * Constructs an Animated 3D Butterfly:
+   * Slender body, glowing translucent wings with delicate stained-glass silhouette.
+   */
+  function create3DButterfly(wingColor = 0x38bdf8, scale = 1.6) {
+    const butterflyGroup = new T.Group();
+    butterflyGroup.scale.set(scale, scale, scale);
+
+    const bodyMat = new T.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+    const body = new T.Mesh(new T.CylinderGeometry(0.04, 0.06, 0.65, 6), bodyMat);
+    body.rotation.x = Math.PI / 2;
+    butterflyGroup.add(body);
+
+    const head = new T.Mesh(new T.SphereGeometry(0.08, 6, 6), bodyMat);
+    head.position.z = 0.38;
+    butterflyGroup.add(head);
+
+    // Glowing antennae
+    [-0.04, 0.04].forEach((ax) => {
+      const ant = new T.Mesh(
+        new T.CylinderGeometry(0.01, 0.01, 0.25, 3),
+        new T.MeshBasicMaterial({ color: 0xffffff })
+      );
+      ant.position.set(ax, 0.12, 0.44);
+      ant.rotation.x = 0.4;
+      ant.rotation.z = ax * 4.0;
+      butterflyGroup.add(ant);
+    });
+
+    const wingMat = new T.MeshStandardMaterial({
+      color: wingColor,
+      emissive: wingColor,
+      emissiveIntensity: 0.95,
+      roughness: 0.15,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.88,
+      side: T.DoubleSide,
+    });
+
+    // Left Wing Assembly
+    const wingHolderL = new T.Group();
+    wingHolderL.position.x = -0.04;
+
+    const forewingGeo = new T.BufferGeometry();
+    forewingGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0, 0,   -0.95, 0.35, 0.35,   -0.85, 0.75, -0.2,
+      0, 0, 0,   -0.85, 0.75, -0.2,   0, 0.35, -0.25
+    ], 3));
+    forewingGeo.computeVertexNormals();
+    const forewingL = new T.Mesh(forewingGeo, wingMat);
+    wingHolderL.add(forewingL);
+
+    const hindwingGeo = new T.BufferGeometry();
+    hindwingGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0, 0,   -0.75, 0.1, -0.35,   -0.45, -0.28, -0.65,
+      0, 0, 0,   -0.45, -0.28, -0.65,   0, 0, -0.45
+    ], 3));
+    hindwingGeo.computeVertexNormals();
+    const hindwingL = new T.Mesh(hindwingGeo, wingMat);
+    wingHolderL.add(hindwingL);
+
+    butterflyGroup.add(wingHolderL);
+
+    // Right Wing Assembly (Mirror)
+    const wingHolderR = new T.Group();
+    wingHolderR.position.x = 0.04;
+
+    const forewingR = forewingL.clone();
+    forewingR.scale.x = -1;
+    wingHolderR.add(forewingR);
+
+    const hindwingR = hindwingL.clone();
+    hindwingR.scale.x = -1;
+    wingHolderR.add(hindwingR);
+
+    butterflyGroup.add(wingHolderR);
+
+    return { group: butterflyGroup, wingHolderL, wingHolderR };
+  }
+
+  /**
+   * Generates a circular radial glow stardust sprite texture
+   * preventing square pixel artifacts on particle points.
+   */
+  function createStardustTexture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+    grad.addColorStop(0.25, "rgba(254, 240, 138, 0.85)");
+    grad.addColorStop(0.65, "rgba(103, 232, 249, 0.35)");
+    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+    const tex = new T.CanvasTexture(canvas);
+    return tex;
   }
 
   function instantiateModel(key, targetHeight = 5.0, isFoliage = false) {
@@ -1178,6 +1305,7 @@
   const interactiveBeacons = [];
   const celestialStars = [];
   const celestialFlowers = [];
+  const celestialButterflies = [];
   const clickTargets = [];
   let waterfallMesh = null;
   let waterfallMat = null;
@@ -1218,6 +1346,73 @@
       });
       station0Group.add(heroIsland);
     }
+
+    // Solid Grassy Mountain Bedrock Foundation
+    // Completely eliminates hollow gaps beneath cottage, dock, and trees from all 360° angles
+    const upperCragGroup = new T.Group();
+
+    const grassTopGeo = new T.CylinderGeometry(15.2, 13.8, 2.2, 24);
+    const grassTopMat = new T.MeshStandardMaterial({
+      color: 0x4ade80,
+      roughness: 0.85,
+      metalness: 0.05,
+      flatShading: true,
+    });
+    applyGhibliToon(grassTopMat, { shadowTint: new T.Color(0x1e3a1e), rimColor: new T.Color(0x86efac) });
+    const grassTop = new T.Mesh(grassTopGeo, grassTopMat);
+    grassTop.position.set(-1.0, 9.6, 3.2);
+    grassTop.scale.set(1.16, 1.0, 1.08);
+    grassTop.castShadow = true;
+    grassTop.receiveShadow = true;
+    upperCragGroup.add(grassTop);
+
+    const rockMat = new T.MeshStandardMaterial({
+      color: 0x475569,
+      roughness: 0.9,
+      metalness: 0.1,
+      flatShading: true,
+    });
+    applyGhibliToon(rockMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0x94a3b8) });
+
+    const rockTier1Geo = new T.CylinderGeometry(13.8, 11.2, 5.5, 18);
+    const rockTier1 = new T.Mesh(rockTier1Geo, rockMat);
+    rockTier1.position.set(-1.0, 6.2, 3.0);
+    rockTier1.castShadow = true;
+    rockTier1.receiveShadow = true;
+    upperCragGroup.add(rockTier1);
+
+    const rockTier2Geo = new T.CylinderGeometry(11.0, 8.2, 6.5, 16);
+    const rockTier2 = new T.Mesh(rockTier2Geo, rockMat);
+    rockTier2.position.set(-0.8, 0.8, 2.6);
+    rockTier2.castShadow = true;
+    rockTier2.receiveShadow = true;
+    upperCragGroup.add(rockTier2);
+
+    [
+      [-8.5, 7.2, -4.5], [7.5, 6.5, -3.0], [-9.5, 5.2, 5.5], [8.0, 4.8, 8.0],
+      [-5.0, 3.0, 9.0], [4.5, 2.2, -4.5], [-2.0, 0.2, 6.0]
+    ].forEach((pos, idx) => {
+      const cragGeo = new T.DodecahedronGeometry(1.5 + (idx % 3) * 0.35, 0);
+      const crag = new T.Mesh(cragGeo, rockMat);
+      crag.position.set(...pos);
+      crag.rotation.set(idx * 0.8, idx * 1.2, idx * 0.5);
+      upperCragGroup.add(crag);
+
+      if (idx % 2 === 0) {
+        const cGemGeo = new T.OctahedronGeometry(0.75, 0);
+        const cGemMat = new T.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 2.2,
+          roughness: 0.2,
+        });
+        const cGem = new T.Mesh(cGemGeo, cGemMat);
+        cGem.position.set(pos[0] * 1.06, pos[1] - 0.2, pos[2] * 1.06);
+        upperCragGroup.add(cGem);
+      }
+    });
+
+    station0Group.add(upperCragGroup);
 
     // 2. The Storybook Cottage atop the grassy crest (height 6.5 units)
     const cottage = instantiateModel("cottage", 6.8);
@@ -1672,19 +1867,21 @@
     /* ═══════════════════════════════════════════════════════════════════
        STATION 3: 03 — CONSTELLATION (Twilight Starlight Skill Realm)
        Clear 3D Star Polyhedra & Radiant 3D Celestial Flowers floating in zero-g.
+       Spaced in an expansive celestial arch with vibrant colors and fluttering butterflies.
        ═══════════════════════════════════════════════════════════════════ */
     const station3Group = new T.Group();
     station3Group.position.set(-85, 55, -80);
     worldGroup.add(station3Group);
 
-    // 6 Master Celestial Skill Nodes (Alternating Clear 3D Spiked Stars & Radiant Flowers)
+    // 7 Master Celestial Skill Nodes (Arranged in an expansive, balanced celestial arch)
     const SKILLS = [
-      { name: "Python",     type: "star",   pos: [0, 8, 0],       color: 0x38bdf8, spike: 4.8, core: 1.8 },
-      { name: "Three.js",   type: "flower", pos: [-14, 15, -6],   color: 0x34d399, scale: 2.8 },
-      { name: "React",      type: "star",   pos: [12, 18, 4],     color: 0x06b6d4, spike: 4.2, core: 1.6 },
-      { name: "PyTorch",    type: "flower", pos: [-8, 26, -12],   color: 0xfbbf24, scale: 2.6 },
-      { name: "TypeScript", type: "star",   pos: [14, 28, -8],    color: 0xa855f7, spike: 4.5, core: 1.7 },
-      { name: "GLSL",       type: "flower", pos: [0, 36, -4],     color: 0xf472b6, scale: 3.0 },
+      { name: "Python",     type: "star",   pos: [-34, 18, 12],   color: 0x38bdf8, spike: 5.2, core: 1.9 }, // Sapphire
+      { name: "Three.js",   type: "flower", pos: [-22, 36, -8],   color: 0x10b981, scale: 3.2 },            // Emerald Lotus
+      { name: "React",      type: "star",   pos: [-4, 46, 8],     color: 0x06b6d4, spike: 4.8, core: 1.8 }, // Prismatic Ice
+      { name: "PyTorch",    type: "flower", pos: [14, 40, -12],   color: 0xf59e0b, scale: 3.0 },            // Golden Amber
+      { name: "TypeScript", type: "star",   pos: [30, 26, 6],     color: 0x8b5cf6, spike: 5.0, core: 1.8 }, // Royal Amethyst
+      { name: "GLSL",       type: "flower", pos: [36, 12, -10],   color: 0xec4899, scale: 3.4 },            // Sakura Blossom
+      { name: "Systems",    type: "star",   pos: [0, 20, -16],    color: 0xf43f5e, spike: 4.5, core: 1.7 }, // Ruby Star
     ];
 
     SKILLS.forEach((sk, i) => {
@@ -1703,70 +1900,80 @@
       }
     });
 
-    // 10 Delicate Clear 3D Mini-Stars drifting in the surrounding starlight
-    const miniStarColors = [0x67e8f9, 0xf472b6, 0xfef08a, 0xa78bfa, 0x34d399];
-    for (let m = 0; m < 10; m++) {
+    // 14 Vibrant Miniature Clear 3D Stars drifting across the celestial realm
+    const miniStarColors = [0x38bdf8, 0xf43f5e, 0xfbbf24, 0xa855f7, 0x10b981, 0x06b6d4, 0xec4899];
+    for (let m = 0; m < 14; m++) {
       const col = miniStarColors[m % miniStarColors.length];
-      const mini = create3DClearStar(0.7, 1.8, col);
-      const mx = (Math.random() - 0.5) * 36;
-      const my = 4 + Math.random() * 38;
-      const mz = (Math.random() - 0.5) * 32;
+      const mini = create3DClearStar(0.7, 1.9, col);
+      const mx = (Math.random() - 0.5) * 56;
+      const my = 8 + Math.random() * 42;
+      const mz = (Math.random() - 0.5) * 44;
       mini.group.position.set(mx, my, mz);
       station3Group.add(mini.group);
       celestialStars.push({ ...mini, baseY: my, seed: m * 3.7 });
       floatingCrystals.push({ obj: mini.group, baseY: my, seed: m * 3.7 });
     }
 
-    // 4 Drifting Celestial Blossom Flowers
-    for (let fl = 0; fl < 4; fl++) {
-      const flCol = fl % 2 === 0 ? 0xf472b6 : 0x38bdf8;
-      const flower = create3DCelestialFlower(1.6, flCol, 0xfffbeb);
-      const fx = (Math.random() - 0.5) * 32;
-      const fy = 6 + Math.random() * 32;
-      const fz = (Math.random() - 0.5) * 28;
+    // 8 Delicate 3D Celestial Blossom Flowers
+    for (let fl = 0; fl < 8; fl++) {
+      const flCol = [0xf472b6, 0x38bdf8, 0xfbbf24, 0x34d399, 0xc084fc][fl % 5];
+      const flower = create3DCelestialFlower(1.8, flCol, 0xfffbeb);
+      const fx = (Math.random() - 0.5) * 50;
+      const fy = 10 + Math.random() * 38;
+      const fz = (Math.random() - 0.5) * 38;
       flower.group.position.set(fx, fy, fz);
       station3Group.add(flower.group);
       celestialFlowers.push({ ...flower, baseY: fy, seed: fl * 4.2 });
       floatingCrystals.push({ obj: flower.group, baseY: fy, seed: fl * 4.2 });
     }
 
-    // Luminous Constellation Lines connecting skill stars and flowers
-    const linePoints = [];
-    for (let i = 0; i < SKILLS.length; i++) {
-      const p1 = new T.Vector3(...SKILLS[i].pos);
-      const p2 = new T.Vector3(...SKILLS[(i + 1) % SKILLS.length].pos);
-      linePoints.push(p1, p2);
-      if (i % 2 === 0) {
-        const p3 = new T.Vector3(...SKILLS[(i + 2) % SKILLS.length].pos);
-        linePoints.push(p1, p3);
-      }
-    }
-    const lineGeo = new T.BufferGeometry().setFromPoints(linePoints);
-    const lineMat = new T.LineBasicMaterial({
-      color: 0x67e8f9,
-      transparent: true,
-      opacity: 0.75,
-      blending: T.AdditiveBlending,
+    // 8 Beautiful 3D Animated Butterflies fluttering around the stars and flowers
+    const butterflyConfigs = [
+      { color: 0x38bdf8, cx: -20, cz: 4,   baseY: 28, rx: 14, rz: 10, speed: 0.0022, flap: 22.0, scale: 1.8 },
+      { color: 0xf97316, cx: 16,  cz: -8,  baseY: 34, rx: 16, rz: 12, speed: 0.0019, flap: 24.0, scale: 1.9 },
+      { color: 0xf472b6, cx: -6,  cz: -12, baseY: 42, rx: 12, rz: 9,  speed: 0.0024, flap: 20.0, scale: 1.7 },
+      { color: 0xa855f7, cx: 24,  cz: 8,   baseY: 22, rx: 15, rz: 11, speed: 0.0021, flap: 23.0, scale: 1.8 },
+      { color: 0x10b981, cx: -28, cz: -6,  baseY: 20, rx: 13, rz: 10, speed: 0.0020, flap: 21.0, scale: 1.6 },
+      { color: 0xfbbf24, cx: 4,   cz: 10,  baseY: 30, rx: 18, rz: 14, speed: 0.0018, flap: 25.0, scale: 2.0 },
+      { color: 0x06b6d4, cx: 8,   cz: -16, baseY: 24, rx: 14, rz: 11, speed: 0.0023, flap: 22.0, scale: 1.7 },
+      { color: 0xec4899, cx: -12, cz: 14,  baseY: 38, rx: 16, rz: 12, speed: 0.0020, flap: 24.0, scale: 1.9 },
+    ];
+    butterflyConfigs.forEach((cfg, idx) => {
+      const bfly = create3DButterfly(cfg.color, cfg.scale);
+      station3Group.add(bfly.group);
+      celestialButterflies.push({
+        ...bfly,
+        centerX: cfg.cx,
+        centerZ: cfg.cz,
+        baseY: cfg.baseY,
+        radiusX: cfg.rx,
+        radiusZ: cfg.rz,
+        flightSpeed: cfg.speed,
+        flapSpeed: cfg.flap,
+        offset: idx * 1.6,
+        seed: idx * 2.3,
+      });
     });
-    const constellationLines = new T.LineSegments(lineGeo, lineMat);
-    station3Group.add(constellationLines);
 
-    // Starlight Fireflies drifting around stars & flowers
-    const ffCount = 90;
+    // Soft Glowing Circular Stardust Orbs (Zero square boxes)
+    const stardustTex = createStardustTexture();
+    const ffCount = 120;
     const ffGeo = new T.BufferGeometry();
     const ffPos = new Float32Array(ffCount * 3);
     for (let f = 0; f < ffCount; f++) {
-      ffPos[f * 3 + 0] = (Math.random() - 0.5) * 45;
-      ffPos[f * 3 + 1] = Math.random() * 45;
-      ffPos[f * 3 + 2] = (Math.random() - 0.5) * 40;
+      ffPos[f * 3 + 0] = (Math.random() - 0.5) * 65;
+      ffPos[f * 3 + 1] = 4 + Math.random() * 50;
+      ffPos[f * 3 + 2] = (Math.random() - 0.5) * 55;
     }
     ffGeo.setAttribute("position", new T.BufferAttribute(ffPos, 3));
     const ffMat = new T.PointsMaterial({
-      color: 0xfff3a8,
-      size: 1.8,
+      map: stardustTex,
+      color: 0xffffff,
+      size: 3.2,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.88,
       blending: T.AdditiveBlending,
+      depthWrite: false,
     });
     const fireflies = new T.Points(ffGeo, ffMat);
     station3Group.add(fireflies);
@@ -2106,8 +2313,8 @@
         const hint = document.getElementById("orbit-hint");
         if (hint) hint.classList.add("fade-out");
       }
-      targetOrbitYaw -= dx * 0.0055;
-      targetOrbitPitch = Math.max(-0.75, Math.min(0.75, targetOrbitPitch + dy * 0.0045));
+      targetOrbitYaw += dx * 0.0055;
+      targetOrbitPitch = Math.max(-0.75, Math.min(0.75, targetOrbitPitch - dy * 0.0045));
       prevPointer.x = e.clientX;
       prevPointer.y = e.clientY;
     } else {
@@ -2298,6 +2505,24 @@
       fl.petals.forEach((p, pi) => {
         p.rotation.x = -0.32 + Math.sin(elapsedTime * 2.2 + idx * 1.5 + pi) * 0.06;
       });
+    });
+
+    // Animate 3D Celestial Butterflies (rapid wing flutter & graceful looping flight)
+    celestialButterflies.forEach((b) => {
+      const flap = Math.sin(elapsedTime * b.flapSpeed + b.seed) * 0.9;
+      b.wingHolderL.rotation.y = flap;
+      b.wingHolderR.rotation.y = -flap;
+
+      const angle = elapsedTime * b.flightSpeed * 60.0 + b.offset;
+      const x = b.centerX + Math.cos(angle) * b.radiusX;
+      const z = b.centerZ + Math.sin(angle * 1.6) * b.radiusZ;
+      const y = b.baseY + Math.sin(elapsedTime * 2.8 + b.seed) * 2.2;
+      b.group.position.set(x, y, z);
+
+      const dx = -Math.sin(angle) * b.radiusX;
+      const dz = Math.cos(angle * 1.6) * b.radiusZ * 1.6;
+      b.group.rotation.y = Math.atan2(dx, dz) + Math.PI / 2;
+      b.group.rotation.z = Math.sin(elapsedTime * 4.0 + b.seed) * 0.22;
     });
 
     // Animate procedural soaring birds (zero skinning glitches)
