@@ -589,16 +589,21 @@
 
   // Global Station Navigator (called by 3D Beacons and Raycasts)
   window.__navigateToStation = (stationIdx) => {
+    // 1. Direct smooth camera flight in 3D world
+    if (typeof window.__flyToStation === "function") {
+      window.__flyToStation(stationIdx);
+    }
+    // 2. Synchronize page scroll
     const ids = ["prologue", "file", "missions", "techniques", "summon"];
     const targetId = ids[stationIdx];
     const el = document.getElementById(targetId);
     if (el) {
       el.scrollIntoView({ behavior: "smooth" });
-      // Play a lovely chime note on visit
-      if (audioCtx && isAudioPlaying) {
-        const chord = CHORDS[stationIdx % CHORDS.length];
-        playPianoNote(chord.notes[0] * 1.5, audioCtx.currentTime, 1.8, 0.08);
-      }
+    }
+    // 3. Play a lovely chime note on visit
+    if (audioCtx && isAudioPlaying) {
+      const chord = CHORDS[stationIdx % CHORDS.length];
+      playPianoNote(chord.notes[0] * 1.5, audioCtx.currentTime, 1.8, 0.08);
     }
   };
 
@@ -616,11 +621,11 @@
   }
 
   const MAP_STATIONS = [
-    { idx: 0, name: "00 · The Hero Isle",        short: "00 HERO",       color: "#10b981", icon: "🏝️", x: 42,  y: 110, id: "prologue" },
-    { idx: 1, name: "01 · Celestial Carnival",   short: "01 CARNIVAL",   color: "#f59e0b", icon: "🎡", x: 180, y: 46,  id: "file" },
-    { idx: 2, name: "02 · Shipped Archipelago",  short: "02 ARCHIPELAGO", color: "#06b6d4", icon: "🌉", x: 84,  y: 72,  id: "missions" },
-    { idx: 3, name: "03 · Starlight Constellation", short: "03 STARS",   color: "#a855f7", icon: "✨", x: 44,  y: 34,  id: "techniques" },
-    { idx: 4, name: "04 · Cosmic Portal",        short: "04 PORTAL",     color: "#38bdf8", icon: "⛩️", x: 122, y: 122, id: "summon" },
+    { idx: 0, name: "00 · The Hero Isle",        short: "00 HERO",        color: "#10b981", icon: "🏝️", x: 110, y: 130, id: "prologue" },
+    { idx: 1, name: "01 · Celestial Carnival",   short: "01 CARNIVAL",    color: "#f59e0b", icon: "🎡", x: 195, y: 92,  id: "file" },
+    { idx: 2, name: "02 · Shipped Archipelago",  short: "02 ARCHIPELAGO", color: "#06b6d4", icon: "🌉", x: 26,  y: 96,  id: "missions" },
+    { idx: 3, name: "03 · Starlight Constellation", short: "03 STARS",    color: "#a855f7", icon: "✨", x: 55,  y: 44,  id: "techniques" },
+    { idx: 4, name: "04 · Cosmic Portal",        short: "04 PORTAL",      color: "#38bdf8", icon: "⛩️", x: 110, y: 18,  id: "summon" },
   ];
 
   if (minimapCanvas) {
@@ -634,12 +639,17 @@
       const mx = (e.clientX - rect.left) * scaleX;
       const my = (e.clientY - rect.top) * scaleY;
 
+      let closest = null;
+      let closestDist = 24;
       for (const st of MAP_STATIONS) {
         const d = Math.hypot(mx - st.x, my - st.y);
-        if (d < 18) {
-          window.__navigateToStation(st.idx);
-          break;
+        if (d < closestDist) {
+          closest = st;
+          closestDist = d;
         }
+      }
+      if (closest) {
+        window.__navigateToStation(closest.idx);
       }
     });
 
@@ -653,7 +663,7 @@
 
       let hovered = false;
       for (const st of MAP_STATIONS) {
-        if (Math.hypot(mx - st.x, my - st.y) < 18) {
+        if (Math.hypot(mx - st.x, my - st.y) < 24) {
           hovered = true;
           minimapCanvas.title = `Fly to ${st.name}`;
           break;
