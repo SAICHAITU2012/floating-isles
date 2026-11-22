@@ -20,7 +20,7 @@
   const T = THREE;
   const PARAMS = new URLSearchParams(location.search);
   const STATIC = PARAMS.has("static");
-  const FORCED_STATION = PARAMS.has("at")
+  let FORCED_STATION = PARAMS.has("at")
     ? parseFloat(PARAMS.get("at"))
     : (PARAMS.has("station") ? parseFloat(PARAMS.get("station")) : null);
   const MOBILE = () => window.innerWidth < 768;
@@ -37,6 +37,7 @@
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE() ? 1.5 : 2.0));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x7dd3fc, 1.0);
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.98;
   if (T.sRGBEncoding) renderer.outputEncoding = T.sRGBEncoding;
@@ -44,7 +45,8 @@
   renderer.shadowMap.type = T.PCFSoftShadowMap;
 
   const scene = new T.Scene();
-  // Soft anime horizon fog: starts at 130, fades into sky at 650
+  scene.background = new T.Color(0x7dd3fc); // Anime sky blue background — never black!
+  // Soft anime horizon fog: starts at 180, fades into sky at 850
   scene.fog = new T.Fog(0x60a5fa, 180, 850);
 
   const camera = new T.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.2, 1200);
@@ -52,6 +54,7 @@
 
   window.__scene = scene;
   window.__camera = camera;
+  window.__renderer = renderer;
 
   // Post-Processing Pipeline
   let composer = null;
@@ -208,7 +211,7 @@
   /* ── 4. PROCEDURAL ANIME SKY DOME & VOLUMETRIC CLOUDS ─────────────── */
 
   // Inverted Sky Dome with Zenith-to-Horizon Gradient & Sun Halo
-  const skyGeo = new T.SphereGeometry(750, 32, 24);
+  const skyGeo = new T.SphereGeometry(1100, 32, 24);
   const skyMat = new T.ShaderMaterial({
     side: T.BackSide,
     depthWrite: false,
@@ -2443,23 +2446,72 @@
     return wrapper;
   }
 
+  const MODEL_ATTACH_CALLBACKS = {};
+  function onModelReady(key, cb) {
+    if (GLTF_CACHE[key]) {
+      cb(GLTF_CACHE[key]);
+    } else {
+      if (!MODEL_ATTACH_CALLBACKS[key]) MODEL_ATTACH_CALLBACKS[key] = [];
+      MODEL_ATTACH_CALLBACKS[key].push(cb);
+    }
+  }
+
+  function attachModelSlot(key, parentGroup, targetHeight, isFoliage, configureFn) {
+    const slot = new T.Group();
+    parentGroup.add(slot);
+    onModelReady(key, () => {
+      const model = instantiateModel(key, targetHeight, isFoliage);
+      if (model) {
+        if (configureFn) configureFn(model);
+        slot.add(model);
+      }
+    });
+    return slot;
+  }
+
   // Pre-load all models asynchronously
   let loadedCount = 0;
   const totalModels = Object.keys(MODEL_URLS).length;
 
   function loadAllModels(onComplete) {
+    let completed = false;
+    const safeComplete = () => {
+      if (!completed) {
+        completed = true;
+        if (typeof onComplete === "function") onComplete();
+      }
+    };
+
+    // Safety timeout: if any model request hangs or drops over the network,
+    // ensure callbacks complete cleanly.
+    // Set to 60s to handle slow Cloudflare / mobile connections gracefully.
+    // Models are attached progressively via attachModelSlot as they arrive,
+    // so the world renders with whatever has loaded by the time timeout fires.
+    setTimeout(() => {
+      if (!completed) {
+        console.warn("[world] loadAllModels timeout — completing with partial loads");
+        safeComplete();
+      }
+    }, 60000);
+
     Object.entries(MODEL_URLS).forEach(([key, url]) => {
       loader.load(
         url,
         (gltf) => {
           GLTF_CACHE[key] = gltf;
           loadedCount++;
+          if (MODEL_ATTACH_CALLBACKS[key]) {
+            MODEL_ATTACH_CALLBACKS[key].forEach((cb) => {
+              try { cb(gltf); } catch (e) { console.warn(e); }
+            });
+            delete MODEL_ATTACH_CALLBACKS[key];
+          }
           // Report real progress to boot screen
           if (typeof window.__updateLoaderProgress === "function") {
             window.__updateLoaderProgress(loadedCount, totalModels, key);
           }
           if (loadedCount >= totalModels) {
-            onComplete();
+            safeComplete();
           }
         },
         undefined,
@@ -2470,7 +2522,7 @@
             window.__updateLoaderProgress(loadedCount, totalModels, key);
           }
           if (loadedCount >= totalModels) {
-            onComplete();
+            safeComplete();
           }
         }
       );
@@ -2509,8 +2561,10 @@
     worldGroup.add(station0Group);
 
     // 1. The Hero Floating Island (nimzu's Fox's Islands, CC-BY)
-    if (GLTF_CACHE.island) {
-      const heroIsland = GLTF_CACHE.island.scene.clone(true);
+    const heroIslandSlot = new T.Group();
+    station0Group.add(heroIslandSlot);
+    onModelReady("island", (gltf) => {
+      const heroIsland = gltf.scene.clone(true);
       window.__heroIsland = heroIsland;
       heroIsland.position.set(0.0, -8.0, 0.0);
       heroIsland.scale.set(0.68, 0.68, 0.68);
@@ -2530,8 +2584,8 @@
           }
         }
       });
-      station0Group.add(heroIsland);
-    }
+      heroIslandSlot.add(heroIsland);
+    });
 
     // Solid Grassy Mountain Bedrock Foundation
     // Completely eliminates hollow gaps beneath cottage, dock, and trees from all 360° angles
@@ -2601,66 +2655,48 @@
     station0Group.add(upperCragGroup);
 
     // 2. The Storybook Cottage atop the grassy crest (height 6.5 units)
-    const cottage = instantiateModel("cottage", 6.8);
-    if (cottage) {
-      cottage.position.set(-6.0, 11.0, -3.5);
-      cottage.rotation.set(0, 0.45, 0);
-      station0Group.add(cottage);
-    }
+    attachModelSlot("cottage", station0Group, 6.8, false, (m) => {
+      m.position.set(-6.0, 11.0, -3.5);
+      m.rotation.set(0, 0.45, 0);
+    });
 
     // 3. Majestic Grand Oak Tree sheltering the cottage (height 12 units)
-    const grandOak = instantiateModel("treeCommon1", 12.5, true);
-    if (grandOak) {
-      grandOak.position.set(-12.5, 11.0, -5.5);
-      grandOak.rotation.set(0, 1.1, 0);
-      station0Group.add(grandOak);
-    }
+    attachModelSlot("treeCommon1", station0Group, 12.5, true, (m) => {
+      m.position.set(-12.5, 11.0, -5.5);
+      m.rotation.set(0, 1.1, 0);
+    });
 
     // Secondary trees & lush vegetation
-    const tree1 = instantiateModel("treeCommon2", 9.5, true);
-    if (tree1) {
-      tree1.position.set(9.0, 9.8, -4.5);
-      tree1.rotation.set(0, 2.1, 0);
-      station0Group.add(tree1);
-    }
+    attachModelSlot("treeCommon2", station0Group, 9.5, true, (m) => {
+      m.position.set(9.0, 9.8, -4.5);
+      m.rotation.set(0, 2.1, 0);
+    });
 
-    const treePine = instantiateModel("treePine", 9.0, true);
-    if (treePine) {
-      treePine.position.set(-13.5, 10.5, 5.0);
-      station0Group.add(treePine);
-    }
+    attachModelSlot("treePine", station0Group, 9.0, true, (m) => {
+      m.position.set(-13.5, 10.5, 5.0);
+    });
 
-    const treeBirch = instantiateModel("treeBirch", 8.0, true);
-    if (treeBirch) {
-      treeBirch.position.set(11.5, 9.5, 4.0);
-      station0Group.add(treeBirch);
-    }
+    attachModelSlot("treeBirch", station0Group, 8.0, true, (m) => {
+      m.position.set(11.5, 9.5, 4.0);
+    });
 
-    const bush1 = instantiateModel("bush", 2.5, true);
-    if (bush1) {
-      bush1.position.set(-2.5, 11.0, 0.5);
-      station0Group.add(bush1);
-    }
+    attachModelSlot("bush", station0Group, 2.5, true, (m) => {
+      m.position.set(-2.5, 11.0, 0.5);
+    });
 
     // 4. Wooden Dock & Lakeside Details
-    const dock = instantiateModel("dock", 2.2);
-    if (dock) {
-      dock.position.set(4.0, 10.2, 9.5);
-      dock.rotation.set(0, -0.6, 0);
-      station0Group.add(dock);
-    }
+    attachModelSlot("dock", station0Group, 2.2, false, (m) => {
+      m.position.set(4.0, 10.2, 9.5);
+      m.rotation.set(0, -0.6, 0);
+    });
 
     // Sculpted Boulders
-    const rock1 = instantiateModel("rock1", 2.8);
-    if (rock1) {
-      rock1.position.set(8.5, 9.8, 8.0);
-      station0Group.add(rock1);
-    }
-    const rock2 = instantiateModel("rock2", 2.6);
-    if (rock2) {
-      rock2.position.set(-7.5, 10.2, 9.0);
-      station0Group.add(rock2);
-    }
+    attachModelSlot("rock1", station0Group, 2.8, false, (m) => {
+      m.position.set(8.5, 9.8, 8.0);
+    });
+    attachModelSlot("rock2", station0Group, 2.6, false, (m) => {
+      m.position.set(-7.5, 10.2, 9.0);
+    });
 
     // 5. Stylized Turquoise Lake with Caustics & Shoreline Foam
     const lakeGeo = new T.CircleGeometry(11.5, 32);
@@ -2833,8 +2869,7 @@
     station1Group.add(obsIsland);
 
     // Pointy Medieval Spire / Observatory Tower
-    const tower = instantiateModel("towerPointy", 16.0);
-    if (tower) {
+    attachModelSlot("towerPointy", station1Group, 16.0, false, (tower) => {
       tower.position.set(0, 2.5, 0);
       // Apply rich fantasy stone colors to the tower parts
       const towerColors = {
@@ -2852,16 +2887,13 @@
           else if (matName.includes("DarkRock")) ch.material.color.set(towerColors.DarkRock);
         }
       });
-      station1Group.add(tower);
       clickTargets.push({ mesh: tower, stationIdx: 1, name: "Observatory Tower", type: "tower" });
-    }
+    });
 
     // Gazebo & Armillary Instrument
-    const gazebo = instantiateModel("gazebo", 5.5);
-    if (gazebo) {
+    attachModelSlot("gazebo", station1Group, 5.5, false, (gazebo) => {
       gazebo.position.set(-10, 2.5, 6);
-      station1Group.add(gazebo);
-    }
+    });
 
     // 1. The Grand Animated Ferris Wheel (Amusement Park centerpiece)
     const ferris = createFerrisWheel(10.5);
@@ -2909,30 +2941,22 @@
       });
     }
 
-    const sakuraTree = instantiateModel("treeAutumn", 9.5, true);
-    if (sakuraTree) {
+    attachModelSlot("treeAutumn", station1Group, 9.5, true, (sakuraTree) => {
       sakuraTree.position.set(11, 2.5, 7);
       styleAutumnTree(sakuraTree, 0xf43f5e); // Vivid Cherry Blossom Rose
-      station1Group.add(sakuraTree);
-    }
-    const sak2 = instantiateModel("treeAutumn", 8.5, true);
-    if (sak2) {
+    });
+    attachModelSlot("treeAutumn", station1Group, 8.5, true, (sak2) => {
       sak2.position.set(-18, 2.5, 2);
       styleAutumnTree(sak2, 0xec4899); // Brilliant Magenta Blossom
-      station1Group.add(sak2);
-    }
-    const aut1 = instantiateModel("treeAutumn", 9.0, true);
-    if (aut1) {
+    });
+    attachModelSlot("treeAutumn", station1Group, 9.0, true, (aut1) => {
       aut1.position.set(6, 2.5, -17);
       styleAutumnTree(aut1, 0xf59e0b); // Glowing Golden Amber Autumn
-      station1Group.add(aut1);
-    }
+    });
     // Emerald Pine
-    const pineObs = instantiateModel("treePine", 7.5, true);
-    if (pineObs) {
+    attachModelSlot("treePine", station1Group, 7.5, true, (pineObs) => {
       pineObs.position.set(-14, 2.5, -3);
-      station1Group.add(pineObs);
-    }
+    });
 
     // 7. Ground Animals (Bunnies grazing on the grass)
     [[-4, 2.5, 3], [6, 2.5, 4], [-8, 2.5, -4], [2, 2.5, -8]].forEach((pos) => {
@@ -3029,17 +3053,13 @@
 
       // Foliage / Pine tree per island
       if (idx % 2 === 0) {
-        const pine = instantiateModel("treePine", 6.5, true);
-        if (pine) {
+        attachModelSlot("treePine", isleG, 6.5, true, (pine) => {
           pine.position.set(3.5, 1.2, -2.5);
-          isleG.add(pine);
-        }
+        });
       } else {
-        const birch = instantiateModel("treeBirch", 6.0, true);
-        if (birch) {
+        attachModelSlot("treeBirch", isleG, 6.0, true, (birch) => {
           birch.position.set(-3.2, 1.2, 2.0);
-          isleG.add(birch);
-        }
+        });
       }
 
       // Connecting suspension bridge between adjacent islands
@@ -3811,13 +3831,43 @@
   let currentStationProgress = FORCED_STATION !== null ? FORCED_STATION : 0;
   let targetStationProgress = currentStationProgress;
 
-  // Track page scroll to drive camera progress (0.0 to 4.0)
+  const STATION_SECTION_IDS = ["prologue", "file", "missions", "techniques", "summon"];
+
+  // Track page scroll to drive camera progress (0.0 to 4.0) with piecewise section accuracy
   function updateScrollProgress() {
     if (FORCED_STATION !== null) return;
-    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    if (maxScroll <= 0) return;
-    const scrollFrac = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
-    targetStationProgress = scrollFrac * 4.0;
+    const y = window.scrollY;
+    const tops = STATION_SECTION_IDS.map((id) => {
+      const el = document.getElementById(id);
+      return el ? el.offsetTop : null;
+    });
+
+    if (tops[0] === null || tops[tops.length - 1] === null) {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) return;
+      targetStationProgress = Math.min(Math.max(y / maxScroll, 0), 1) * 4.0;
+      return;
+    }
+
+    if (y <= tops[0]) {
+      targetStationProgress = 0;
+      return;
+    }
+    const lastIdx = tops.length - 1;
+    if (y >= tops[lastIdx]) {
+      targetStationProgress = lastIdx;
+      return;
+    }
+
+    for (let i = 0; i < lastIdx; i++) {
+      const t0 = tops[i];
+      const t1 = tops[i + 1];
+      if (y >= t0 && y <= t1) {
+        const frac = t1 > t0 ? (y - t0) / (t1 - t0) : 0;
+        targetStationProgress = i + frac;
+        return;
+      }
+    }
   }
 
   window.addEventListener("scroll", updateScrollProgress, { passive: true });
@@ -4042,6 +4092,11 @@
 
     camera.position.set(cx + mouse.x, cy - mouse.y, cz);
     camera.lookAt(currentLookAt);
+
+    // Keep sky dome centered on camera so sky is infinite and seamless everywhere
+    if (typeof skyDome !== "undefined" && skyDome) {
+      skyDome.position.set(camera.position.x, camera.position.y * 0.25, camera.position.z);
+    }
 
     // Update animated shader materials (waterfall, caustics, foliage wind)
     animatedMaterials.forEach((mat) => {
@@ -4327,11 +4382,19 @@
     }
   }
 
-  // Kick off loading and scene generation
+  // Start animation loop immediately so 3D sky, clouds & atmosphere render from frame 0
+  animate();
+
+  // Build all station geometry IMMEDIATELY — model slots (attachModelSlot/onModelReady)
+  // will fill in as downloads complete, so the world skeletons appear instantly
+  // and models pop in progressively. This is what makes it feel fast even on slow connections.
+  buildStations();
+  updateScrollProgress();
+
+  // Kick off all GLB asset downloads in parallel
   loadAllModels(() => {
-    buildStations();
-    updateScrollProgress();
-    animate();
+    // All models done — world is fully populated now
+    console.log("[world] All models loaded ✓");
   });
 
 })();

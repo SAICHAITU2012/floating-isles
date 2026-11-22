@@ -31,11 +31,12 @@ const server = http.createServer((req, res) => {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+    const isAsset = ext === '.glb' || ext === '.wasm' || ext === '.png' || ext === '.jpg' || ext === '.svg';
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': stats.size,
       'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': isAsset ? 'public, max-age=86400' : 'no-cache',
     });
 
     const stream = fs.createReadStream(filePath);

@@ -60,11 +60,21 @@
     }
   }, 100);
 
-  // Safety fallback after 6s in case WebGL takes long
+  // Safety fallback — wait up to 40s for slow connections (Cloudflare tunnel etc.)
+  // Partial-load fallback at 10s: dismiss boot but let models continue loading
+  setTimeout(() => {
+    // After 10s, if still loading, dismiss boot so user sees sky + whatever has loaded
+    // Models will continue popping in after boot is gone
+    if (!window.__WORLD_LOADED) {
+      // Partial dismiss: show "still loading..." note
+      if (bootStatus) bootStatus.textContent = "world is vast — please wait a moment…";
+    }
+  }, 10000);
+  // Hard fallback at 40s — force dismiss regardless
   setTimeout(() => {
     clearInterval(bootCheck);
     finishBoot();
-  }, 6000);
+  }, 40000);
 
   if (boot) {
     boot.addEventListener("click", finishBoot, { once: true });
@@ -819,5 +829,24 @@
       el.scrollIntoView();
       $$(".reveal", el).forEach((r) => r.classList.add("in"));
     }, 60);
+  }
+
+  // Handle direct hash navigation (#missions, #file, #techniques, #summon)
+  const initialHash = window.location.hash.replace("#", "");
+  const hashStationMap = { prologue: 0, file: 1, missions: 2, techniques: 3, summon: 4 };
+  if (initialHash && hashStationMap[initialHash] !== undefined) {
+    const targetIdx = hashStationMap[initialHash];
+    const triggerJump = () => {
+      if (typeof window.__flyToStation === "function") {
+        window.__flyToStation(targetIdx);
+      }
+      const el = document.getElementById(initialHash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+        $$(".reveal", el).forEach((r) => r.classList.add("in"));
+      }
+    };
+    setTimeout(triggerJump, 250);
+    setTimeout(triggerJump, 900);
   }
 })();
