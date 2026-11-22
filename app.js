@@ -24,40 +24,49 @@
   /* ── 1 · boot ───────────────────────────────────────────────── */
 
   const boot = $("#boot");
-  const bootLines = $(".boot-lines", boot);
-  const bootFill = $(".boot-bar-fill", boot);
-
-  const BOOT_SCRIPT = [
-    "raising the isles from the sea ........ <ok>[ok]</ok>",
-    "charting the flight path .............. <ok>[ok]</ok>",
-    "lighting beacons · feeding waterfall .. <ok>[ok]</ok>",
-    "wind is fair — <hl>the journey begins</hl>.",
-  ];
+  const bootFill = $("#boot-bar-fill", boot);
+  const bootPct = $("#boot-pct", boot);
+  const bootStatus = $("#boot-status", boot);
 
   function finishBoot() {
-    boot.classList.add("done");
-    setTimeout(() => boot.remove(), 540);
-    startCounters();
+    if (!boot || boot.classList.contains("done")) return;
+    if (bootFill) bootFill.style.width = "100%";
+    if (bootPct) bootPct.textContent = "100%";
+    if (bootStatus) bootStatus.textContent = "sky realm manifested · ascending…";
+    
+    setTimeout(() => {
+      boot.classList.add("done");
+      setTimeout(() => boot.remove(), 750);
+      startCounters();
+    }, 400);
   }
 
-  if (REDUCED) {
-    boot.remove();
-    startCounters();
-  } else {
-    BOOT_SCRIPT.forEach((line, i) => {
-      setTimeout(() => {
-        const el = document.createElement("div");
-        el.className = "boot-line";
-        el.innerHTML = line
-          .replace(/<ok>/g, '<span class="ok">')
-          .replace(/<\/ok>/g, "</span>")
-          .replace(/<hl>/g, '<span class="hl">')
-          .replace(/<\/hl>/g, "</span>");
-        bootLines.appendChild(el);
-        bootFill.style.width = `${((i + 1) / BOOT_SCRIPT.length) * 100}%`;
-      }, 140 + i * 200);
-    });
-    setTimeout(finishBoot, 140 + BOOT_SCRIPT.length * 200 + 380);
+  // Real-time progress feedback from 3D model loader
+  window.__updateLoaderProgress = (loaded, total, key) => {
+    const pct = Math.min(Math.round((loaded / total) * 100), 98);
+    if (bootFill) bootFill.style.width = `${pct}%`;
+    if (bootPct) bootPct.textContent = `${pct}%`;
+    if (bootStatus) {
+      const cleanKey = key.replace(/([A-Z])/g, " $1").toLowerCase();
+      bootStatus.textContent = `summoning ${cleanKey} (${loaded}/${total})…`;
+    }
+  };
+
+  // Poll for world ready or user skip
+  const bootCheck = setInterval(() => {
+    if (window.__WORLD_LOADED) {
+      clearInterval(bootCheck);
+      finishBoot();
+    }
+  }, 100);
+
+  // Safety fallback after 6s in case WebGL takes long
+  setTimeout(() => {
+    clearInterval(bootCheck);
+    finishBoot();
+  }, 6000);
+
+  if (boot) {
     boot.addEventListener("click", finishBoot, { once: true });
   }
 
@@ -163,30 +172,220 @@
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
-  /* ── 6 · audio — wind-chime pentatonic ──────────────────────── */
+  /* ── 6 · audio — Ghibli ambient soundtrack & chime engine ──── */
 
   let audioCtx = null;
-  function playChime(mult = 1) {
+  let masterGain = null;
+  let isAudioPlaying = false;
+  let musicTimer = null;
+  let chordIdx = 0;
+  let audioUserEnabled = localStorage.getItem("floating_realm_audio") !== "muted";
+
+  const CHORDS = [
+    // 0: Cmaj9 — wonder & sunrise
+    { bass: 130.81, notes: [261.63, 329.63, 392.00, 493.88, 587.33, 659.25] },
+    // 1: Am9 — airy & nostalgic
+    { bass: 110.00, notes: [220.00, 261.63, 329.63, 392.00, 493.88, 523.25] },
+    // 2: Fmaj7 — gentle ascending dream
+    { bass: 87.31,  notes: [174.61, 261.63, 329.63, 349.23, 440.00, 523.25] },
+    // 3: Gsus4 / G6 — expansive open sky
+    { bass: 98.00,  notes: [196.00, 293.66, 392.00, 440.00, 493.88, 587.33] },
+  ];
+
+  function initAudio() {
+    if (audioCtx) return;
     try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state !== "running") audioCtx.resume();
-      const notes = [220.0, 261.63, 293.66, 329.63, 392.0];
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(
-        notes[Math.floor(Math.random() * notes.length)] * mult,
-        audioCtx.currentTime
-      );
-      gain.gain.setValueAtTime(0, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.045, audioCtx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.55);
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
+
+      // Master output with gentle limiter
+      masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+      // Warm feedback delay for spacious ambient reverberation
+      const delay = audioCtx.createDelay();
+      delay.delayTime.value = 0.38;
+      const feedback = audioCtx.createGain();
+      feedback.gain.value = 0.32;
+      const delayFilter = audioCtx.createBiquadFilter();
+      delayFilter.type = "lowpass";
+      delayFilter.frequency.value = 2200;
+
+      delay.connect(feedback);
+      feedback.connect(delayFilter);
+      delayFilter.connect(delay);
+      delay.connect(masterGain);
+
+      masterGain.connect(audioCtx.destination);
+      window.__audioDelay = delay;
+    } catch (e) {
+      console.warn("Web Audio not supported:", e);
+    }
+  }
+
+  function playPianoNote(freq, time, duration = 2.4, velocity = 0.08) {
+    if (!audioCtx || !masterGain) return;
+    try {
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const noteGain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc1.type = "triangle";
+      osc1.frequency.setValueAtTime(freq, time);
+
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(freq * 2.002, time);
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(Math.min(freq * 3.5, 3400), time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.2, 300), time + duration);
+
+      noteGain.gain.setValueAtTime(0, time);
+      noteGain.gain.linearRampToValueAtTime(velocity, time + 0.02);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(noteGain);
+      noteGain.connect(masterGain);
+      if (window.__audioDelay) noteGain.connect(window.__audioDelay);
+
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + duration);
+      osc2.stop(time + duration);
     } catch (e) {}
   }
+
+  function playAmbientPad(freq, time, duration = 5.2, velocity = 0.035) {
+    if (!audioCtx || !masterGain) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const padGain = audioCtx.createGain();
+      const padFilter = audioCtx.createBiquadFilter();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, time);
+
+      padFilter.type = "lowpass";
+      padFilter.frequency.setValueAtTime(800, time);
+
+      padGain.gain.setValueAtTime(0, time);
+      padGain.gain.linearRampToValueAtTime(velocity, time + 1.2);
+      padGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+      osc.connect(padFilter);
+      padFilter.connect(padGain);
+      padGain.connect(masterGain);
+
+      osc.start(time);
+      osc.stop(time + duration);
+    } catch (e) {}
+  }
+
+  function scheduleNextPhrase() {
+    if (!isAudioPlaying || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    const chord = CHORDS[chordIdx % CHORDS.length];
+    chordIdx++;
+
+    // 1. Warm bass pad
+    playAmbientPad(chord.bass, now, 6.2, 0.04);
+    playAmbientPad(chord.bass * 1.5, now + 0.1, 5.8, 0.025);
+
+    // 2. Delicate piano arpeggios (Ghibli pentatonic style)
+    const arpeggioNotes = [...chord.notes].sort(() => Math.random() - 0.5).slice(0, 4);
+    arpeggioNotes.forEach((freq, idx) => {
+      const noteTime = now + 0.15 + idx * 0.55 + Math.random() * 0.15;
+      playPianoNote(freq, noteTime, 3.2, 0.06);
+    });
+
+    // 3. High celestial sparkle chime
+    if (Math.random() > 0.35) {
+      const chimeFreq = chord.notes[Math.floor(Math.random() * chord.notes.length)] * 2;
+      playPianoNote(chimeFreq, now + 2.4 + Math.random() * 0.8, 4.0, 0.03);
+    }
+
+    musicTimer = setTimeout(scheduleNextPhrase, 3600);
+  }
+
+  function startSoundtrack() {
+    initAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (isAudioPlaying) return;
+    isAudioPlaying = true;
+
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(0.24, audioCtx.currentTime + 2.5);
+
+    scheduleNextPhrase();
+    updateAudioButtonUI(true);
+  }
+
+  function pauseSoundtrack() {
+    if (!isAudioPlaying || !audioCtx || !masterGain) return;
+    isAudioPlaying = false;
+    clearTimeout(musicTimer);
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+    updateAudioButtonUI(false);
+  }
+
+  function toggleSoundtrack() {
+    if (isAudioPlaying) {
+      pauseSoundtrack();
+      audioUserEnabled = false;
+      localStorage.setItem("floating_realm_audio", "muted");
+    } else {
+      audioUserEnabled = true;
+      localStorage.setItem("floating_realm_audio", "active");
+      startSoundtrack();
+    }
+  }
+
+  function updateAudioButtonUI(playing) {
+    const btn = document.getElementById("audio-toggle");
+    if (!btn) return;
+    if (playing) {
+      btn.classList.add("playing");
+      btn.querySelector(".audio-label").textContent = "sound: on";
+    } else {
+      btn.classList.remove("playing");
+      btn.querySelector(".audio-label").textContent = "sound: off";
+    }
+  }
+
+  function playChime(mult = 1) {
+    initAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state !== "running") audioCtx.resume();
+    const notes = [220.0, 261.63, 293.66, 329.63, 392.0];
+    const freq = notes[Math.floor(Math.random() * notes.length)] * mult;
+    playPianoNote(freq, audioCtx.currentTime, 1.4, 0.08);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("audio-toggle");
+    if (btn) btn.addEventListener("click", toggleSoundtrack);
+    updateAudioButtonUI(audioUserEnabled);
+  });
+
+  // Autoplay compliance: smoothly trigger audio upon first user gesture if enabled
+  const userGestureHandler = () => {
+    if (audioUserEnabled && !isAudioPlaying) {
+      startSoundtrack();
+    }
+    window.removeEventListener("click", userGestureHandler);
+    window.removeEventListener("scroll", userGestureHandler);
+    window.removeEventListener("keydown", userGestureHandler);
+  };
+  window.addEventListener("click", userGestureHandler, { once: true });
+  window.addEventListener("scroll", userGestureHandler, { once: true });
+  window.addEventListener("keydown", userGestureHandler, { once: true });
 
   /* ── 7 · ⌘K course-plotter ──────────────────────────────────── */
 

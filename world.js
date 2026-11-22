@@ -485,6 +485,10 @@
         (gltf) => {
           GLTF_CACHE[key] = gltf;
           loadedCount++;
+          // Report real progress to boot screen
+          if (typeof window.__updateLoaderProgress === "function") {
+            window.__updateLoaderProgress(loadedCount, totalModels, key);
+          }
           if (loadedCount >= totalModels) {
             onComplete();
           }
@@ -493,6 +497,9 @@
         (err) => {
           console.warn(`Could not load model ${key} from ${url}:`, err);
           loadedCount++;
+          if (typeof window.__updateLoaderProgress === "function") {
+            window.__updateLoaderProgress(loadedCount, totalModels, key);
+          }
           if (loadedCount >= totalModels) {
             onComplete();
           }
@@ -910,6 +917,15 @@
     if (mill) {
       mill.position.set(-4, 9.8, 12);
       station2Group.add(mill);
+
+      // Find the Mill_Blades node so we can spin it around the HORIZONTAL shaft
+      mill.traverse((ch) => {
+        if (ch.name === "Mill_Blades") {
+          // Mill_Blades has parent rotation [-PI/2, 0, x] so its local Y axis
+          // points horizontally in world space — that is the real blade shaft axis.
+          rotatingElements.push({ obj: ch, rotateAxisY: true, speed: 0.025 });
+        }
+      });
     }
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -1243,9 +1259,16 @@
 
     // Animate rotating elements
     rotatingElements.forEach((item) => {
-      if (item.speedX) item.obj.rotation.x += item.speedX;
-      if (item.speedY) item.obj.rotation.y += item.speedY;
-      if (item.speedZ) item.obj.rotation.z += item.speedZ;
+      if (item.rotateAxisY) {
+        // Horizontal shaft rotation (windmill blades)
+        item.obj.rotateY(item.speed);
+      } else if (item.rotateAxisZ) {
+        item.obj.rotateZ(item.speed);
+      } else {
+        if (item.speedX) item.obj.rotation.x += item.speedX;
+        if (item.speedY) item.obj.rotation.y += item.speedY;
+        if (item.speedZ) item.obj.rotation.z += item.speedZ;
+      }
     });
 
     // Animate floating crystals in zero-g

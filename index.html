@@ -19,16 +19,24 @@
 <body>
 
   <!-- ══ boot ══ -->
-  <div id="boot" aria-hidden="true">
+  <div id="boot" aria-label="Loading Floating Realm">
+    <div class="boot-backdrop"></div>
     <div class="boot-inner">
       <div class="boot-sigil">
-        <svg viewBox="0 0 64 64">
-          <path d="M32 10 L54 48 L10 48 Z" fill="none" stroke="#67e8f9" stroke-width="2" class="boot-tri"/>
-          <circle cx="32" cy="36" r="5" fill="#67e8f9" class="boot-dot"/>
+        <svg viewBox="0 0 80 80" width="80" height="80">
+          <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(56,189,248,0.25)" stroke-width="1.5" stroke-dasharray="4 6" class="boot-ring"/>
+          <path d="M40 14 L66 58 L14 58 Z" fill="none" stroke="#67e8f9" stroke-width="2" class="boot-tri"/>
+          <circle cx="40" cy="43" r="5" fill="#67e8f9" class="boot-dot"/>
+          <path d="M26 50 Q40 38 54 50" fill="none" stroke="#e879f9" stroke-width="1.5" opacity="0.8"/>
         </svg>
       </div>
-      <div class="boot-lines"></div>
-      <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+      <div class="boot-title disp">THE FLOATING REALM</div>
+      <div class="boot-subtitle mono">S. SADHASRI // AN EXPLORABLE SKY ARCHIPELAGO</div>
+      <div class="boot-progress-wrap">
+        <div class="boot-bar"><div class="boot-bar-fill" id="boot-bar-fill"></div></div>
+        <div class="boot-pct mono" id="boot-pct">0%</div>
+      </div>
+      <div class="boot-status mono" id="boot-status">manifesting fantasy world · loading 3D assets…</div>
     </div>
   </div>
 
@@ -66,6 +74,10 @@
         <a href="#summon" data-section="summon"><span class="nav-num">04</span>portal</a>
       </nav>
       <div class="nav-actions">
+        <button id="audio-toggle" class="nav-audio mono" type="button" aria-label="Toggle ambient soundtrack">
+          <span class="audio-glyph">♫</span>
+          <span class="audio-label">sound: on</span>
+        </button>
         <button id="cmdk-open" class="nav-cmdk" type="button" aria-label="open command palette">
           <span class="cmdk-key">⌘</span><span class="cmdk-key">K</span>
         </button>
