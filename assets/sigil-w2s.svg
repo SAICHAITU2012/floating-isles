@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-label="w2s constellation sigil">
+  <defs>
+    <filter id="glow-w2s" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4.5" result="b" />
+      <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <radialGradient id="fade-w2s" cx="50%" cy="50%" r="50%">
+      <stop offset="55%" stop-color="#86dbe8" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#86dbe8" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <circle cx="120.0" cy="120.0" r="112" fill="url(#fade-w2s)" />
+
+  <g fill="none" stroke="#f3b673" stroke-width="0.7" opacity="0.45">
+    <circle cx="120.0" cy="120.0" r="104" />
+  </g>
+  <g fill="none" stroke="#f3b673" stroke-width="0.6" opacity="0.28">
+    <line x1="224.0" y1="120.0" x2="228.0" y2="120.0" /><line x1="220.5" y1="146.9" x2="222.4" y2="147.4" /><line x1="210.1" y1="172.0" x2="211.8" y2="173.0" /><line x1="193.5" y1="193.5" x2="195.0" y2="195.0" /><line x1="172.0" y1="210.1" x2="173.0" y2="211.8" /><line x1="146.9" y1="220.5" x2="147.4" y2="222.4" /><line x1="120.0" y1="224.0" x2="120.0" y2="228.0" /><line x1="93.1" y1="220.5" x2="92.6" y2="222.4" /><line x1="68.0" y1="210.1" x2="67.0" y2="211.8" /><line x1="46.5" y1="193.5" x2="45.0" y2="195.0" /><line x1="29.9" y1="172.0" x2="28.2" y2="173.0" /><line x1="19.5" y1="146.9" x2="17.6" y2="147.4" /><line x1="16.0" y1="120.0" x2="12.0" y2="120.0" /><line x1="19.5" y1="93.1" x2="17.6" y2="92.6" /><line x1="29.9" y1="68.0" x2="28.2" y2="67.0" /><line x1="46.5" y1="46.5" x2="45.0" y2="45.0" /><line x1="68.0" y1="29.9" x2="67.0" y2="28.2" /><line x1="93.1" y1="19.5" x2="92.6" y2="17.6" /><line x1="120.0" y1="16.0" x2="120.0" y2="12.0" /><line x1="146.9" y1="19.5" x2="147.4" y2="17.6" /><line x1="172.0" y1="29.9" x2="173.0" y2="28.2" /><line x1="193.5" y1="46.5" x2="195.0" y2="45.0" /><line x1="210.1" y1="68.0" x2="211.8" y2="67.0" /><line x1="220.5" y1="93.1" x2="222.4" y2="92.6" />
+  </g>
+
+  <g fill="none" stroke="#86dbe8" stroke-width="0.9" opacity="0.5">
+    <path d="M 78.1 42.6
+             A 88 88 0 1 1 84.8 200.7" />
+  </g>
+
+  <polyline points="150.1,124.3 87.6,141.6 133.5,81.7 149.7,157.4 53.0,113.1 166.4,68.5 118.3,201.7 150.1,124.3" fill="none" stroke="#f3b673" stroke-width="0.85" opacity="0.62" stroke-linejoin="round" />
+  <polyline points="87.6,141.6 133.5,81.7 149.7,157.4 53.0,113.1 166.4,68.5" fill="none" stroke="#86dbe8" stroke-width="0.5" opacity="0.3" stroke-dasharray="2 5" />
+
+  <g fill="#ffd9a3" filter="url(#glow-w2s)">
+    <circle cx="150.1" cy="124.3" r="1.7" />
+    <circle cx="87.6" cy="141.6" r="1.7" />
+    <circle cx="133.5" cy="81.7" r="1.7" />
+    <circle cx="149.7" cy="157.4" r="1.7" />
+    <circle cx="53.0" cy="113.1" r="1.7" />
+    <circle cx="166.4" cy="68.5" r="1.7" />
+    <circle cx="118.3" cy="201.7" r="2.6" />
+  </g>
+
+  <g fill="none" stroke="#f3b673" stroke-width="0.6" opacity="0.5">
+    <line x1="106.0" y1="212" x2="134.0" y2="212" />
+    <line x1="120.0" y1="208" x2="120.0" y2="216" />
+  </g>
+</svg>
