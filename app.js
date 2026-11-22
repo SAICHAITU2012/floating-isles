@@ -474,7 +474,12 @@
       cmdkOpen ? closeCmdk() : openCmdk();
       return;
     }
-    if (!cmdkOpen) return;
+    if (!cmdkOpen) {
+      if (e.key === "Escape" && document.body.classList.contains("cinema-mode")) {
+        setCinemaMode(false);
+      }
+      return;
+    }
     if (e.key === "Escape") { closeCmdk(); return; }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -493,7 +498,79 @@
     }
   });
 
-  /* ── 8 · misc + QA hooks ────────────────────────────────────── */
+  /* ── 8 · cinema mode, panel minimize & 3D navigation hooks ──── */
+
+  // Minimizable Panels & Station Expand Pills
+  $$(".panel-min-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const targetId = btn.dataset.target;
+      const panel = $(`#${targetId}`);
+      if (panel) {
+        panel.classList.add("minimized");
+        const pill = $(`[data-target="${targetId}"].station-expand-pill`);
+        if (pill) pill.hidden = false;
+      }
+    });
+  });
+
+  $$(".station-expand-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      const targetId = pill.dataset.target;
+      const panel = $(`#${targetId}`);
+      if (panel) {
+        panel.classList.remove("minimized");
+        pill.hidden = true;
+      }
+    });
+  });
+
+  // Cinema Mode (Pure 3D View without UI Clutter)
+  const cinemaToggle = $("#cinema-toggle");
+  const cinemaExit = $("#cinema-exit");
+  const cinemaHud = $("#cinema-hud");
+
+  function setCinemaMode(active) {
+    document.body.classList.toggle("cinema-mode", active);
+    if (cinemaToggle) cinemaToggle.classList.toggle("active", active);
+    if (cinemaHud) cinemaHud.hidden = !active;
+  }
+
+  if (cinemaToggle) {
+    cinemaToggle.addEventListener("click", () => {
+      const isCinema = document.body.classList.contains("cinema-mode");
+      setCinemaMode(!isCinema);
+    });
+  }
+
+  if (cinemaExit) {
+    cinemaExit.addEventListener("click", () => setCinemaMode(false));
+  }
+
+  // Global Station Navigator (called by 3D Beacons and Raycasts)
+  window.__navigateToStation = (stationIdx) => {
+    const ids = ["prologue", "file", "missions", "techniques", "summon"];
+    const targetId = ids[stationIdx];
+    const el = document.getElementById(targetId);
+    if (el) {
+      // If panel was minimized, restore it
+      const panel = $(`#panel-${stationIdx}`);
+      if (panel && panel.classList.contains("minimized")) {
+        panel.classList.remove("minimized");
+        const pill = $(`[data-target="panel-${stationIdx}"].station-expand-pill`);
+        if (pill) pill.hidden = true;
+      }
+      el.scrollIntoView({ behavior: "smooth" });
+
+      // Play a lovely chime note on visit
+      if (audioCtx && isAudioPlaying) {
+        const chord = CHORDS[stationIdx % CHORDS.length];
+        playPianoNote(chord.notes[0] * 1.5, audioCtx.currentTime, 1.8, 0.08);
+      }
+    }
+  };
+
+  /* ── 9 · misc + QA hooks ────────────────────────────────────── */
 
   $("#year").textContent = new Date().getFullYear();
 
@@ -501,6 +578,9 @@
     const idx = Math.min(4, Math.max(0, parseInt(PARAMS.get("at"), 10)));
     const ids = ["prologue", "file", "missions", "techniques", "summon"];
     const el = document.getElementById(ids[idx]);
-    if (el) setTimeout(() => el.scrollIntoView(), 60);
+    if (el) setTimeout(() => {
+      el.scrollIntoView();
+      $$(".reveal", el).forEach((r) => r.classList.add("in"));
+    }, 60);
   }
 })();

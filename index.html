@@ -78,6 +78,10 @@
           <span class="audio-glyph">♫</span>
           <span class="audio-label">sound: on</span>
         </button>
+        <button id="cinema-toggle" class="nav-cinema mono" type="button" aria-label="Toggle 360° Cinema View">
+          <span class="cinema-glyph">👁</span>
+          <span class="cinema-label">3D view</span>
+        </button>
         <button id="cmdk-open" class="nav-cmdk" type="button" aria-label="open command palette">
           <span class="cmdk-key">⌘</span><span class="cmdk-key">K</span>
         </button>
@@ -86,11 +90,28 @@
     </div>
   </header>
 
+  <!-- ══ 3D HUD Tooltip & 360° Orbit Hints ══ -->
+  <div id="world-hud-tooltip" class="mono" aria-hidden="true"></div>
+  <div id="orbit-hint" class="mono" aria-hidden="true">
+    <span class="hint-glyph">⟲</span> drag to orbit 360° · scroll to fly · click beacons
+  </div>
+  <div id="cinema-hud" class="mono" hidden>
+    <div class="cinema-hud-inner">
+      <span class="cinema-hud-badge">● 3D REALM MODE</span>
+      <span>drag to orbit 360° · scroll or click beacons to travel</span>
+      <button id="cinema-exit" class="cinema-exit-btn" type="button">exit [esc]</button>
+    </div>
+  </div>
+
   <main id="main">
 
     <!-- ══ STATION 00 · PROLOGUE ══ -->
     <section id="prologue" class="station">
-      <div class="panel hero-panel">
+      <div class="panel hero-panel" id="panel-0">
+        <div class="panel-top-bar">
+          <span class="panel-sigil mono">✦ ISLE 00</span>
+          <button class="panel-min-btn mono" type="button" data-target="panel-0" aria-label="Minimize panel to view scenery">✕ minimize</button>
+        </div>
         <p class="overline mono reveal">THE FLOATING ISLES <span class="sl">//</span> an explorable portfolio <span class="sl">/</span> 島</p>
         <h1 class="hero-name reveal" style="--d:.08s">S.&nbsp;SADHASRI</h1>
         <p class="hero-typed reveal mono" style="--d:.16s"><span class="typed-glyph">▶</span> <span id="typed">full-stack developer</span><span class="caret">_</span></p>
@@ -110,18 +131,25 @@
           <li><span class="stat-n" data-count="5">0</span><span class="stat-l">isles to visit</span></li>
         </ul>
       </div>
+      <div class="station-expand-pill mono" data-target="panel-0" role="button" tabindex="0" hidden>
+        <span class="pill-spark">✦</span> 00 · The Hero Isle <span class="pill-act">[click for details]</span>
+      </div>
       <a class="scroll-cue mono" href="#file" aria-label="begin descent"><span>descend</span><span class="cue-line"></span></a>
     </section>
 
     <!-- ══ STATION 01 · OBSERVATORY ══ -->
     <section id="file" class="station">
-      <div class="panel reveal">
+      <div class="panel reveal" id="panel-1">
+        <div class="panel-top-bar">
+          <span class="panel-sigil mono">✦ OBSERVATORY 01</span>
+          <button class="panel-min-btn mono" type="button" data-target="panel-1" aria-label="Minimize panel to view scenery">✕ minimize</button>
+        </div>
         <div class="panel-head mono"><span class="pn">01</span> the observatory <span class="sl">//</span> 建物</div>
         <h2 class="panel-title disp">WHO FLIES THESE SKIES</h2>
         <p class="panel-body">
           I'm <strong>S. SadhaSri</strong> — a full-stack engineer &amp; ML enthusiast from India.
           I forge fast, expressive web platforms, predictive pipelines, and automation tooling
-          for AI agents. The observatory ahead holds my dossier and affinities —
+          for AI agents. The celestial carnival and observatory ahead hold my dossier and affinities —
           everything measured, nothing claimed.
         </p>
         <div class="affinities">
@@ -131,6 +159,9 @@
           <div class="af"><span class="af-label mono">systems</span><span class="af-rank mono">A−</span><div class="af-bar"><i class="mag" style="--w:80%"></i></div></div>
         </div>
         <p class="panel-foot mono"><span class="creed-mark">//</span> curiosity is the wind · empathy is the compass · code is the vessel</p>
+      </div>
+      <div class="station-expand-pill mono" data-target="panel-1" role="button" tabindex="0" hidden>
+        <span class="pill-spark">✦</span> 01 · Celestial Carnival &amp; Observatory <span class="pill-act">[click for details]</span>
       </div>
       <div class="side-facts reveal mono">
         <p><b>13</b> public repos</p>
@@ -142,10 +173,17 @@
 
     <!-- ══ STATION 02 · ARCHIPELAGO ══ -->
     <section id="missions" class="station wide">
-      <div class="panel wide-panel reveal">
+      <div class="panel wide-panel reveal" id="panel-2">
+        <div class="panel-top-bar">
+          <span class="panel-sigil mono">✦ ARCHIPELAGO 02</span>
+          <button class="panel-min-btn mono" type="button" data-target="panel-2" aria-label="Minimize panel to view scenery">✕ minimize</button>
+        </div>
         <div class="panel-head mono"><span class="pn">02</span> the archipelago <span class="sl">//</span> 諸島</div>
         <h2 class="panel-title disp">SIX MISSIONS. SIX ISLANDS.</h2>
         <p class="panel-body">Each island below carries one shipped mission — the camera glides across them as you read. Beacons mark what's live.</p>
+      </div>
+      <div class="station-expand-pill mono" data-target="panel-2" role="button" tabindex="0" hidden>
+        <span class="pill-spark">✦</span> 02 · Shipped Archipelago <span class="pill-act">[click for details]</span>
       </div>
 
       <div class="mission-row">
@@ -191,7 +229,11 @@
 
     <!-- ══ STATION 03 · CONSTELLATION ══ -->
     <section id="techniques" class="station">
-      <div class="panel reveal">
+      <div class="panel reveal" id="panel-3">
+        <div class="panel-top-bar">
+          <span class="panel-sigil mono">✦ CONSTELLATION 03</span>
+          <button class="panel-min-btn mono" type="button" data-target="panel-3" aria-label="Minimize panel to view scenery">✕ minimize</button>
+        </div>
         <div class="panel-head mono"><span class="pn">03</span> the constellation <span class="sl">//</span> 星座</div>
         <h2 class="panel-title disp">WHAT THE STARS KNOW</h2>
         <p class="panel-body">Look up as we fly — every technique I wield is a star in the constellations above. Four skies, four disciplines.</p>
@@ -203,11 +245,18 @@
         </div>
         <p class="panel-foot mono"><span class="creed-mark">//</span> currently charting → systems engineering · cloud pipelines · agent architectures</p>
       </div>
+      <div class="station-expand-pill mono" data-target="panel-3" role="button" tabindex="0" hidden>
+        <span class="pill-spark">✦</span> 03 · Starlight Constellation <span class="pill-act">[click for details]</span>
+      </div>
     </section>
 
     <!-- ══ STATION 04 · PORTAL ══ -->
     <section id="summon" class="station">
-      <div class="panel reveal summon-panel">
+      <div class="panel reveal summon-panel" id="panel-4">
+        <div class="panel-top-bar">
+          <span class="panel-sigil mono">✦ PORTAL 04</span>
+          <button class="panel-min-btn mono" type="button" data-target="panel-4" aria-label="Minimize panel to view scenery">✕ minimize</button>
+        </div>
         <div class="panel-head mono"><span class="pn">04</span> the portal <span class="sl">//</span> 門</div>
         <h2 class="panel-title disp">ONE DOOR. OPEN.</h2>
         <p class="panel-body">The flight ends here — the portal hums with everything we crossed. Step through: my inbox is open for collaborations, open source, and interesting problems.</p>
@@ -217,12 +266,18 @@
         </div>
         <p class="panel-foot mono"><span class="creed-mark">//</span> response time: fast — the portal is always lit</p>
       </div>
+      <div class="station-expand-pill mono" data-target="panel-4" role="button" tabindex="0" hidden>
+        <span class="pill-spark">✦</span> 04 · Cosmic Portal <span class="pill-act">[click for details]</span>
+      </div>
     </section>
 
     <footer id="site-footer">
       <div class="footer-inner mono">
-        <p>© <span id="year">2026</span> S. SADHASRI — a world built from primitives, no assets downloaded</p>
-        <p class="footer-mid">three.js · vanilla js · zero frameworks · procedural everything</p>
+        <p>© <span id="year">2026</span> S. SADHASRI — enchanted floating islands fantasy world</p>
+        <p class="footer-mid">three.js · procedural shaders &amp; hand-crafted 3d islands · zero build steps</p>
+        <p>v10.0 · explorable 360° realm · press <span class="cmdk-key">⌘</span><span class="cmdk-key">K</span></p>
+      </div>
+    </footer>
         <p>v9.0 · enchanted fantasy world · press <span class="cmdk-key">⌘</span><span class="cmdk-key">K</span></p>
       </div>
     </footer>

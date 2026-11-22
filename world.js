@@ -357,7 +357,6 @@
   const GLTF_CACHE = {};
   const MODEL_URLS = {
     island: "assets/models/island.glb",
-    bird: "assets/models/bird.glb",
     treeCommon1: "assets/models/tree_common_1.glb",
     treeCommon2: "assets/models/tree_common_2.glb",
     treeAutumn: "assets/models/tree_autumn.glb",
@@ -433,6 +432,663 @@
     group.add(capMesh);
 
     return group;
+  }
+
+  /* ── 5.1 FANTASY CARNIVAL & LIVING CREATURE GENERATORS ────────── */
+
+  function createFerrisWheel(radius = 10.0) {
+    const group = new T.Group();
+    const legMat = new T.MeshStandardMaterial({ color: 0xd97706, roughness: 0.45, metalness: 0.65 });
+    const legGeo = new T.CylinderGeometry(0.28, 0.45, radius * 2.3, 8);
+
+    [-1.8, 1.8].forEach((zOffset) => {
+      const legL = new T.Mesh(legGeo, legMat);
+      legL.position.set(-radius * 0.48, radius * 0.98, zOffset);
+      legL.rotation.z = 0.26;
+      group.add(legL);
+
+      const legR = new T.Mesh(legGeo, legMat);
+      legR.position.set(radius * 0.48, radius * 0.98, zOffset);
+      legR.rotation.z = -0.26;
+      group.add(legR);
+
+      const braceGeo = new T.CylinderGeometry(0.16, 0.16, radius * 0.85, 6);
+      const brace = new T.Mesh(braceGeo, legMat);
+      brace.position.set(0, radius * 0.68, zOffset);
+      brace.rotation.z = Math.PI / 2;
+      group.add(brace);
+    });
+
+    const axleGeo = new T.CylinderGeometry(0.42, 0.42, 4.4, 12);
+    const axle = new T.Mesh(axleGeo, legMat);
+    axle.position.set(0, radius * 1.95, 0);
+    axle.rotation.x = Math.PI / 2;
+    group.add(axle);
+
+    const wheelGroup = new T.Group();
+    wheelGroup.position.set(0, radius * 1.95, 0);
+    group.add(wheelGroup);
+
+    const rimMat = new T.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.7 });
+    const spokeMat = new T.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.3, metalness: 0.8 });
+
+    [-1.4, 1.4].forEach((z) => {
+      const rimGeo = new T.TorusGeometry(radius, 0.2, 8, 36);
+      const rim = new T.Mesh(rimGeo, rimMat);
+      rim.position.z = z;
+      wheelGroup.add(rim);
+
+      const innerRimGeo = new T.TorusGeometry(radius * 0.52, 0.15, 8, 36);
+      const innerRim = new T.Mesh(innerRimGeo, rimMat);
+      innerRim.position.z = z;
+      wheelGroup.add(innerRim);
+    });
+
+    const gondolas = [];
+    const numGondolas = 8;
+    const cabinColors = [0xef4444, 0xf59e0b, 0x10b981, 0x06b6d4, 0x8b5cf6, 0xec4899, 0x3b82f6, 0xf97316];
+
+    for (let i = 0; i < numGondolas; i++) {
+      const theta = (i / numGondolas) * Math.PI * 2;
+      const px = Math.cos(theta) * radius;
+      const py = Math.sin(theta) * radius;
+
+      [-1.4, 1.4].forEach((z) => {
+        const spokeGeo = new T.CylinderGeometry(0.08, 0.08, radius, 6);
+        const spoke = new T.Mesh(spokeGeo, spokeMat);
+        spoke.position.set(px * 0.5, py * 0.5, z);
+        spoke.rotation.z = theta - Math.PI / 2;
+        wheelGroup.add(spoke);
+      });
+
+      const strutGeo = new T.CylinderGeometry(0.12, 0.12, 2.9, 6);
+      const strut = new T.Mesh(strutGeo, spokeMat);
+      strut.position.set(px, py, 0);
+      strut.rotation.x = Math.PI / 2;
+      wheelGroup.add(strut);
+
+      const gondola = new T.Group();
+      gondola.position.set(px, py, 0);
+
+      const cabinColor = cabinColors[i % cabinColors.length];
+      const cabinMat = new T.MeshStandardMaterial({ color: cabinColor, roughness: 0.55 });
+      const roofMat = new T.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.5 });
+
+      const basketGeo = new T.BoxGeometry(1.4, 1.0, 1.8);
+      const basket = new T.Mesh(basketGeo, cabinMat);
+      basket.position.y = -0.65;
+      gondola.add(basket);
+
+      const roofGeo = new T.ConeGeometry(1.3, 0.7, 4);
+      const roof = new T.Mesh(roofGeo, roofMat);
+      roof.position.y = 0.45;
+      roof.rotation.y = Math.PI / 4;
+      gondola.add(roof);
+
+      const lightGeo = new T.SphereGeometry(0.18, 8, 8);
+      const lightMat = new T.MeshStandardMaterial({ color: cabinColor, emissive: cabinColor, emissiveIntensity: 2.5 });
+      const light = new T.Mesh(lightGeo, lightMat);
+      light.position.y = 0.85;
+      gondola.add(light);
+
+      wheelGroup.add(gondola);
+      gondolas.push(gondola);
+    }
+
+    for (let i = 0; i < 24; i++) {
+      const angle = (i / 24) * Math.PI * 2;
+      const fx = Math.cos(angle) * radius;
+      const fy = Math.sin(angle) * radius;
+      [-1.4, 1.4].forEach((fz) => {
+        const flGeo = new T.SphereGeometry(0.14, 6, 6);
+        const flMat = new T.MeshStandardMaterial({
+          color: (i % 2 === 0) ? 0xfef08a : 0x67e8f9,
+          emissive: (i % 2 === 0) ? 0xfbbf24 : 0x38bdf8,
+          emissiveIntensity: 2.8,
+        });
+        const fl = new T.Mesh(flGeo, flMat);
+        fl.position.set(fx, fy, fz);
+        wheelGroup.add(fl);
+      });
+    }
+
+    return { group, wheelGroup, gondolas, speed: 0.006 };
+  }
+
+  function createCarousel(radius = 5.2) {
+    const group = new T.Group();
+
+    const deckGeo = new T.CylinderGeometry(radius, radius * 1.04, 0.5, 18);
+    const deckMat = new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+    const deck = new T.Mesh(deckGeo, deckMat);
+    deck.position.y = 0.25;
+    group.add(deck);
+
+    const rotGroup = new T.Group();
+    rotGroup.position.y = 0.5;
+    group.add(rotGroup);
+
+    const pillarGeo = new T.CylinderGeometry(0.8, 1.1, 4.4, 12);
+    const pillarMat = new T.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.6, roughness: 0.3 });
+    const pillar = new T.Mesh(pillarGeo, pillarMat);
+    pillar.position.y = 2.2;
+    rotGroup.add(pillar);
+
+    const roofGeo = new T.ConeGeometry(radius * 1.1, 2.4, 18);
+    const roofMat = new T.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.6 });
+    const roof = new T.Mesh(roofGeo, roofMat);
+    roof.position.y = 4.8;
+    rotGroup.add(roof);
+
+    const flagGeo = new T.ConeGeometry(0.3, 0.8, 4);
+    const flagMat = new T.MeshStandardMaterial({ color: 0xfbbf24 });
+    const flag = new T.Mesh(flagGeo, flagMat);
+    flag.position.y = 6.2;
+    rotGroup.add(flag);
+
+    const mounts = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const r = radius * 0.65;
+      const px = Math.cos(angle) * r;
+      const pz = Math.sin(angle) * r;
+
+      const poleGeo = new T.CylinderGeometry(0.06, 0.06, 3.8, 6);
+      const poleMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.9, roughness: 0.2 });
+      const pole = new T.Mesh(poleGeo, poleMat);
+      pole.position.set(px, 1.9, pz);
+      rotGroup.add(pole);
+
+      const mountGroup = new T.Group();
+      mountGroup.position.set(px, 1.4, pz);
+      mountGroup.rotation.y = angle + Math.PI / 2;
+
+      const bodyMat = new T.MeshStandardMaterial({
+        color: (i % 2 === 0) ? 0x38bdf8 : 0xf472b6,
+        roughness: 0.5,
+      });
+      const body = new T.Mesh(new T.BoxGeometry(0.6, 0.5, 1.1), bodyMat);
+      mountGroup.add(body);
+
+      const head = new T.Mesh(new T.BoxGeometry(0.4, 0.5, 0.5), bodyMat);
+      head.position.set(0, 0.45, 0.45);
+      mountGroup.add(head);
+
+      rotGroup.add(mountGroup);
+      mounts.push({ obj: mountGroup, baseY: 1.4, seed: i * 1.5 });
+    }
+
+    return { group, rotGroup, mounts, speed: 0.014 };
+  }
+
+  function createBalloonCluster(x, y, z, count = 7) {
+    const group = new T.Group();
+    group.position.set(x, y, z);
+    const colors = [0xef4444, 0xf59e0b, 0x10b981, 0x38bdf8, 0x8b5cf6, 0xec4899, 0xfacc15];
+
+    for (let i = 0; i < count; i++) {
+      const bGeo = new T.SphereGeometry(0.55 + Math.random() * 0.15, 12, 10);
+      bGeo.scale(1, 1.25, 1);
+      const bMat = new T.MeshStandardMaterial({
+        color: colors[i % colors.length],
+        roughness: 0.25,
+        metalness: 0.15,
+        emissive: colors[i % colors.length],
+        emissiveIntensity: 0.35,
+      });
+      const balloon = new T.Mesh(bGeo, bMat);
+      const bx = (Math.random() - 0.5) * 1.2;
+      const by = 2.8 + (Math.random() - 0.5) * 1.2;
+      const bz = (Math.random() - 0.5) * 1.2;
+      balloon.position.set(bx, by, bz);
+      group.add(balloon);
+
+      const strGeo = new T.CylinderGeometry(0.01, 0.01, by, 3);
+      const strMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+      const str = new T.Mesh(strGeo, strMat);
+      str.position.set(bx * 0.5, by * 0.5, bz * 0.5);
+      group.add(str);
+    }
+    return group;
+  }
+
+  function createCarnivalTent(radius = 4.2, height = 5.2, primaryColor = 0xdc2626, secondaryColor = 0xfffbeb) {
+    const group = new T.Group();
+
+    const wallGeo = new T.CylinderGeometry(radius, radius, height * 0.5, 16, 1, true);
+    const wallMat = new T.MeshStandardMaterial({ color: secondaryColor, roughness: 0.8 });
+    const wall = new T.Mesh(wallGeo, wallMat);
+    wall.position.y = height * 0.25;
+    group.add(wall);
+
+    const roofGeo = new T.ConeGeometry(radius * 1.15, height * 0.6, 16);
+    const roofMat = new T.MeshStandardMaterial({ color: primaryColor, roughness: 0.6 });
+    const roof = new T.Mesh(roofGeo, roofMat);
+    roof.position.y = height * 0.5 + height * 0.3;
+    group.add(roof);
+
+    const flagGeo = new T.ConeGeometry(0.28, 0.8, 4);
+    const flagMat = new T.MeshStandardMaterial({ color: 0xfbbf24 });
+    const flag = new T.Mesh(flagGeo, flagMat);
+    flag.position.y = height * 1.1;
+    group.add(flag);
+
+    return group;
+  }
+
+  function createMagicFountain(radius = 2.6) {
+    const group = new T.Group();
+
+    const basinGeo = new T.CylinderGeometry(radius, radius * 0.85, 0.8, 16);
+    const basinMat = new T.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.7 });
+    const basin = new T.Mesh(basinGeo, basinMat);
+    basin.position.y = 0.4;
+    group.add(basin);
+
+    const waterGeo = new T.CircleGeometry(radius * 0.9, 16);
+    const waterMat = new T.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.8,
+      roughness: 0.1,
+      metalness: 0.5,
+    });
+    const water = new T.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.78;
+    group.add(water);
+
+    const spireGeo = new T.CylinderGeometry(0.2, 0.35, 1.8, 8);
+    const spireMat = new T.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8, roughness: 0.2 });
+    const spire = new T.Mesh(spireGeo, spireMat);
+    spire.position.y = 1.2;
+    group.add(spire);
+
+    const orbGeo = new T.SphereGeometry(0.38, 12, 12);
+    const orbMat = new T.MeshStandardMaterial({
+      color: 0x67e8f9,
+      emissive: 0x38bdf8,
+      emissiveIntensity: 2.4,
+    });
+    const orb = new T.Mesh(orbGeo, orbMat);
+    orb.position.y = 2.2;
+    group.add(orb);
+
+    return group;
+  }
+
+  function createSkyFish(color = 0x38bdf8, scale = 1.0) {
+    const fishGroup = new T.Group();
+    fishGroup.scale.set(scale, scale, scale);
+
+    const bodyGeo = new T.ConeGeometry(0.7, 3.2, 8);
+    bodyGeo.rotateX(Math.PI / 2);
+    const fishMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 0.75,
+      roughness: 0.3,
+      metalness: 0.4,
+      flatShading: true,
+    });
+    const body = new T.Mesh(bodyGeo, fishMat);
+    body.position.z = 0.5;
+    fishGroup.add(body);
+
+    const headGeo = new T.SphereGeometry(0.68, 8, 8);
+    const head = new T.Mesh(headGeo, fishMat);
+    head.position.z = 1.8;
+    fishGroup.add(head);
+
+    const eyeMat = new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.2 });
+    [-0.45, 0.45].forEach((ex) => {
+      const eye = new T.Mesh(new T.SphereGeometry(0.12, 6, 6), eyeMat);
+      eye.position.set(ex, 0.2, 1.9);
+      fishGroup.add(eye);
+    });
+
+    const finMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.75,
+      side: T.DoubleSide,
+    });
+
+    const dorsalGeo = new T.BufferGeometry();
+    dorsalGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0.5, 0.8,   0, 1.4, -0.2,   0, 0.3, -0.8
+    ], 3));
+    dorsalGeo.computeVertexNormals();
+    const dorsal = new T.Mesh(dorsalGeo, finMat);
+    fishGroup.add(dorsal);
+
+    [-1, 1].forEach((side) => {
+      const pecGeo = new T.BufferGeometry();
+      pecGeo.setAttribute("position", new T.Float32BufferAttribute([
+        0, 0, 1.0,   side * 1.6, -0.3, 0.2,   0, -0.2, 0.2
+      ], 3));
+      pecGeo.computeVertexNormals();
+      const pec = new T.Mesh(pecGeo, finMat);
+      fishGroup.add(pec);
+    });
+
+    const tailGroup = new T.Group();
+    tailGroup.position.set(0, 0, -1.1);
+    const tailGeo = new T.BufferGeometry();
+    tailGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0, 0,   0, 1.1, -1.5,   0, -1.1, -1.5,
+      0, 0, 0,   0, 0.8, -1.8,   0, -0.8, -1.8
+    ], 3));
+    tailGeo.computeVertexNormals();
+    const tail = new T.Mesh(tailGeo, finMat);
+    tailGroup.add(tail);
+    fishGroup.add(tailGroup);
+
+    return { mesh: fishGroup, tailGroup };
+  }
+
+  function createFairy(color = 0xec4899) {
+    const group = new T.Group();
+
+    const coreMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 3.2,
+    });
+    const core = new T.Mesh(new T.SphereGeometry(0.28, 8, 8), coreMat);
+    group.add(core);
+
+    const wingMat = new T.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: color,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.75,
+      side: T.DoubleSide,
+    });
+
+    const wingL = new T.Group();
+    const wGeo = new T.BufferGeometry();
+    wGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0, 0,   0.7, 0.5, 0,   0.5, -0.3, 0
+    ], 3));
+    wGeo.computeVertexNormals();
+    const wMeshL = new T.Mesh(wGeo, wingMat);
+    wingL.add(wMeshL);
+    group.add(wingL);
+
+    const wingR = new T.Group();
+    const wMeshR = new T.Mesh(wGeo, wingMat);
+    wMeshR.scale.x = -1;
+    wingR.add(wMeshR);
+    group.add(wingR);
+
+    return { group, wingL, wingR };
+  }
+
+  function createBunny(color = 0xfffbeb) {
+    const bunny = new T.Group();
+    const mat = new T.MeshStandardMaterial({ color, roughness: 0.85 });
+
+    const body = new T.Mesh(new T.SphereGeometry(0.35, 8, 8), mat);
+    body.scale.set(0.9, 0.85, 1.2);
+    body.position.y = 0.3;
+    bunny.add(body);
+
+    const head = new T.Mesh(new T.SphereGeometry(0.24, 8, 8), mat);
+    head.position.set(0, 0.55, 0.35);
+    bunny.add(head);
+
+    [-0.1, 0.1].forEach((ex) => {
+      const ear = new T.Mesh(new T.ConeGeometry(0.08, 0.45, 5), mat);
+      ear.position.set(ex, 0.82, 0.3);
+      ear.rotation.x = -0.2;
+      bunny.add(ear);
+    });
+
+    const tail = new T.Mesh(new T.SphereGeometry(0.12, 6, 6), mat);
+    tail.position.set(0, 0.32, -0.45);
+    bunny.add(tail);
+
+    return bunny;
+  }
+
+  function createIslandBeacon(label, color = 0x38bdf8) {
+    const beacon = new T.Group();
+
+    const gemGeo = new T.OctahedronGeometry(1.6, 0);
+    const gemMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 2.5,
+      roughness: 0.1,
+      metalness: 0.8,
+    });
+    const gem = new T.Mesh(gemGeo, gemMat);
+    beacon.add(gem);
+
+    const haloGeo = new T.TorusGeometry(2.4, 0.12, 6, 24);
+    const haloMat = new T.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: color,
+      emissiveIntensity: 2.0,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const halo = new T.Mesh(haloGeo, haloMat);
+    halo.rotation.x = Math.PI / 2;
+    beacon.add(halo);
+
+    beacon.userData = { label, isBeacon: true };
+    return { beacon, gem, halo };
+  }
+
+  /* ── 5.2 3D CLEAR REFRACTIVE STARS & CELESTIAL FLOWERS ────────── */
+
+  /**
+   * Constructs a true 3D Clear Star Shape:
+   * A nonconvex 3D polyhedron (stellated icosahedron) with light-transmitting surfaces,
+   * visible internal/external edges, optical refraction (IOR 1.52), depth, and a luminous inner core diamond.
+   */
+  function create3DClearStar(coreRadius = 1.8, spikeRadius = 4.4, color = 0x67e8f9) {
+    const starGroup = new T.Group();
+
+    // 20-pointed stellated icosahedron (Kepler-Poinsot star)
+    const baseIcosa = new T.IcosahedronGeometry(coreRadius, 0);
+    const posAttr = baseIcosa.getAttribute("position");
+    const numFaces = posAttr.count / 3;
+
+    const starPositions = [];
+    for (let f = 0; f < numFaces; f++) {
+      const ax = posAttr.getX(f * 3 + 0);
+      const ay = posAttr.getY(f * 3 + 0);
+      const az = posAttr.getZ(f * 3 + 0);
+
+      const bx = posAttr.getX(f * 3 + 1);
+      const by = posAttr.getY(f * 3 + 1);
+      const bz = posAttr.getZ(f * 3 + 1);
+
+      const cx = posAttr.getX(f * 3 + 2);
+      const cy = posAttr.getY(f * 3 + 2);
+      const cz = posAttr.getZ(f * 3 + 2);
+
+      // Face center normal
+      const mx = (ax + bx + cx) / 3;
+      const my = (ay + by + cy) / 3;
+      const mz = (az + bz + cz) / 3;
+      const mLen = Math.sqrt(mx * mx + my * my + mz * mz) || 1;
+
+      // Spike tip extending outward along face normal
+      const tipX = (mx / mLen) * spikeRadius;
+      const tipY = (my / mLen) * spikeRadius;
+      const tipZ = (mz / mLen) * spikeRadius;
+
+      // 3 triangular facets meeting at the sharp apex
+      starPositions.push(ax, ay, az,  bx, by, bz,  tipX, tipY, tipZ);
+      starPositions.push(bx, by, bz,  cx, cy, cz,  tipX, tipY, tipZ);
+      starPositions.push(cx, cy, cz,  ax, ay, az,  tipX, tipY, tipZ);
+    }
+
+    const starGeo = new T.BufferGeometry();
+    starGeo.setAttribute("position", new T.Float32BufferAttribute(starPositions, 3));
+    starGeo.computeVertexNormals();
+
+    // Clear, light-transmitting refractive crystal material revealing internal depth
+    const glassMat = new T.MeshPhysicalMaterial({
+      color: color,
+      transmission: 0.88,
+      opacity: 0.72,
+      transparent: true,
+      roughness: 0.08,
+      reflectivity: 0.85,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.08,
+      emissive: new T.Color(color),
+      emissiveIntensity: 0.45,
+      side: T.DoubleSide,
+      flatShading: true,
+      depthWrite: false,
+    });
+
+    const starMesh = new T.Mesh(starGeo, glassMat);
+    starGroup.add(starMesh);
+
+    // Visible internal and external geometric facet edges
+    const edgesGeo = new T.EdgesGeometry(starGeo, 24);
+    const edgesMat = new T.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.82,
+      blending: T.AdditiveBlending,
+    });
+    const edgesMesh = new T.LineSegments(edgesGeo, edgesMat);
+    starGroup.add(edgesMesh);
+
+    // Internal glowing starlight diamond inside the transparent star
+    const coreGeo = new T.OctahedronGeometry(coreRadius * 0.55, 0);
+    const coreMat = new T.MeshStandardMaterial({
+      color: color,
+      emissive: color,
+      emissiveIntensity: 3.2,
+      roughness: 0.1,
+      metalness: 0.8,
+    });
+    const coreMesh = new T.Mesh(coreGeo, coreMat);
+    starGroup.add(coreMesh);
+
+    // Glowing orbital halo ring
+    const ringGeo = new T.TorusGeometry(spikeRadius * 0.95, 0.05, 6, 32);
+    const ringMat = new T.MeshBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: 0.65,
+      blending: T.AdditiveBlending,
+    });
+    const ringMesh = new T.Mesh(ringGeo, ringMat);
+    starGroup.add(ringMesh);
+
+    return { group: starGroup, starMesh, edgesMesh, coreMesh, ringMesh };
+  }
+
+  /**
+   * Constructs a 3D Celestial Flower:
+   * Radiant glowing stamen core, 6 curved translucent iridescent petals, and glowing pistils.
+   */
+  function create3DCelestialFlower(scale = 2.4, petalColor = 0xf472b6, coreColor = 0xfef08a) {
+    const flowerGroup = new T.Group();
+    flowerGroup.scale.set(scale, scale, scale);
+
+    const centerMat = new T.MeshStandardMaterial({
+      color: coreColor,
+      emissive: coreColor,
+      emissiveIntensity: 3.0,
+      roughness: 0.2,
+    });
+    const centerMesh = new T.Mesh(new T.SphereGeometry(0.38, 12, 12), centerMat);
+    flowerGroup.add(centerMesh);
+
+    const numPetals = 6;
+    const petals = [];
+    const petalMat = new T.MeshStandardMaterial({
+      color: petalColor,
+      emissive: petalColor,
+      emissiveIntensity: 0.65,
+      roughness: 0.15,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.85,
+      side: T.DoubleSide,
+    });
+
+    for (let p = 0; p < numPetals; p++) {
+      const angle = (p / numPetals) * Math.PI * 2;
+      const petalHolder = new T.Group();
+      petalHolder.rotation.y = angle;
+
+      const petalGeo = new T.BufferGeometry();
+      const w = 0.65;
+      const l = 1.6;
+      petalGeo.setAttribute("position", new T.Float32BufferAttribute([
+        0, 0, 0,        w * 0.5, 0.22, l * 0.5,   0, 0.45, l,
+        0, 0, 0,        0, 0.45, l,               -w * 0.5, 0.22, l * 0.5,
+      ], 3));
+      petalGeo.computeVertexNormals();
+
+      const petalMesh = new T.Mesh(petalGeo, petalMat);
+      petalMesh.rotation.x = -0.32;
+      petalHolder.add(petalMesh);
+      flowerGroup.add(petalHolder);
+      petals.push(petalMesh);
+    }
+
+    for (let s = 0; s < 4; s++) {
+      const sa = (s / 4) * Math.PI * 2;
+      const stamen = new T.Mesh(
+        new T.CylinderGeometry(0.02, 0.02, 0.5, 4),
+        new T.MeshBasicMaterial({ color: 0xffffff })
+      );
+      stamen.position.set(Math.cos(sa) * 0.18, 0.25, Math.sin(sa) * 0.18);
+      stamen.rotation.x = Math.sin(sa) * 0.3;
+      stamen.rotation.z = Math.cos(sa) * 0.3;
+      flowerGroup.add(stamen);
+
+      const tip = new T.Mesh(
+        new T.SphereGeometry(0.06, 6, 6),
+        new T.MeshBasicMaterial({ color: 0xfef08a })
+      );
+      tip.position.set(Math.cos(sa) * 0.28, 0.5, Math.sin(sa) * 0.28);
+      flowerGroup.add(tip);
+    }
+
+    return { group: flowerGroup, petals, centerMesh };
+  }
+
+  /**
+   * Procedural Soaring Bird:
+   * Lightweight pure geometry (zero bones/skinning) that never glitches.
+   */
+  function createProceduralBird() {
+    const birdGroup = new T.Group();
+    const mat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+    const body = new T.Mesh(new T.ConeGeometry(0.2, 1.0, 4), mat);
+    body.rotation.x = Math.PI / 2;
+    birdGroup.add(body);
+
+    const wingGeo = new T.BufferGeometry();
+    wingGeo.setAttribute("position", new T.Float32BufferAttribute([
+      0, 0, 0,   -1.5, 0.15, -0.4,   0, 0, -0.6
+    ], 3));
+    wingGeo.computeVertexNormals();
+    const wingL = new T.Mesh(wingGeo, new T.MeshStandardMaterial({ color: 0xffffff, side: T.DoubleSide }));
+    birdGroup.add(wingL);
+
+    const wingR = new T.Mesh(wingGeo, new T.MeshStandardMaterial({ color: 0xffffff, side: T.DoubleSide }));
+    wingR.scale.x = -1;
+    birdGroup.add(wingR);
+
+    return { group: birdGroup, wingL, wingR };
   }
 
   function instantiateModel(key, targetHeight = 5.0, isFoliage = false) {
@@ -515,6 +1171,14 @@
   const flyingBirds = [];
   const rotatingElements = [];
   const floatingCrystals = [];
+  const swimmingFish = [];
+  const flyingFairies = [];
+  const carnivalRides = [];
+  const groundAnimals = [];
+  const interactiveBeacons = [];
+  const celestialStars = [];
+  const celestialFlowers = [];
+  const clickTargets = [];
   let waterfallMesh = null;
   let waterfallMat = null;
   let waterfallParticles = null;
@@ -774,15 +1438,16 @@
     animatedMaterials.push(mistMat);
 
     /* ═══════════════════════════════════════════════════════════════════
-       STATION 1: 01 — OBSERVATORY (The Celestial Peak & Castle Spire)
-       Elevated island, pointy medieval spire, sakura trees, celestial spheres.
+       STATION 1: 01 — OBSERVATORY & CELESTIAL CARNIVAL (Joyful Theme Park)
+       Elevated island, pointy medieval spire, Grand Ferris Wheel, Carousel,
+       circus tent, magic fountain, balloon clusters, sakura trees & fairies!
        ═══════════════════════════════════════════════════════════════════ */
     const station1Group = new T.Group();
     station1Group.position.set(105, 14, -145);
     worldGroup.add(station1Group);
 
-    // Stratified Fantasy Peak for Observatory
-    const obsIsland = createFantasyIsland(26.0, 34.0, 5, 0x475569, 0x16a34a);
+    // Stratified Fantasy Peak for Observatory & Carnival
+    const obsIsland = createFantasyIsland(30.0, 36.0, 5, 0x475569, 0x16a34a);
     obsIsland.position.y = 1.0;
     station1Group.add(obsIsland);
 
@@ -791,26 +1456,102 @@
     if (tower) {
       tower.position.set(0, 2.5, 0);
       station1Group.add(tower);
+      clickTargets.push({ mesh: tower, stationIdx: 1, name: "Observatory Tower", type: "tower" });
     }
 
     // Gazebo & Armillary Instrument
     const gazebo = instantiateModel("gazebo", 5.5);
     if (gazebo) {
-      gazebo.position.set(-12, 2.5, 5);
+      gazebo.position.set(-10, 2.5, 6);
       station1Group.add(gazebo);
     }
 
-    // Cherry Blossom (Sakura) Trees with pink tinted leaves
+    // 1. The Grand Animated Ferris Wheel (Amusement Park centerpiece)
+    const ferris = createFerrisWheel(10.5);
+    ferris.group.position.set(16, 2.5, -6);
+    ferris.group.rotation.y = -0.38;
+    station1Group.add(ferris.group);
+    carnivalRides.push(ferris);
+    clickTargets.push({ mesh: ferris.group, stationIdx: 1, name: "Ferris Wheel", type: "ride" });
+
+    // 2. The Carousel / Merry-Go-Round with bobbing mounts
+    const carousel = createCarousel(5.0);
+    carousel.group.position.set(-14, 2.5, -11);
+    station1Group.add(carousel.group);
+    carnivalRides.push(carousel);
+    clickTargets.push({ mesh: carousel.group, stationIdx: 1, name: "Carousel", type: "ride" });
+
+    // 3. Striped Circus Pavilion Tent
+    const tent = createCarnivalTent(4.4, 5.2, 0xdc2626, 0xfffbeb);
+    tent.position.set(0, 2.5, -16);
+    station1Group.add(tent);
+
+    // 4. Crystalline Magic Fountain
+    const fountain = createMagicFountain(2.8);
+    fountain.position.set(0, 2.5, 9);
+    station1Group.add(fountain);
+
+    // 5. Colorful Balloon Clusters
+    station1Group.add(createBalloonCluster(9, 2.5, 12, 7));
+    station1Group.add(createBalloonCluster(-9, 2.5, 13, 7));
+    station1Group.add(createBalloonCluster(19, 2.5, 4, 7));
+
+    // 6. Cherry Blossom (Sakura) & Golden Autumn Trees
     const sakuraTree = instantiateModel("treeAutumn", 9.5, true);
     if (sakuraTree) {
-      sakuraTree.position.set(11, 2.5, 6);
+      sakuraTree.position.set(11, 2.5, 7);
       sakuraTree.traverse((ch) => {
-        if (ch.isMesh && ch.material) {
-          ch.material.color.set(0xffb7c5); // Sakura Pink
-        }
+        if (ch.isMesh && ch.material) ch.material.color.set(0xffb7c5);
       });
       station1Group.add(sakuraTree);
     }
+    const sak2 = instantiateModel("treeAutumn", 8.5, true);
+    if (sak2) {
+      sak2.position.set(-18, 2.5, 2);
+      sak2.traverse((ch) => {
+        if (ch.isMesh && ch.material) ch.material.color.set(0xffa7b8);
+      });
+      station1Group.add(sak2);
+    }
+    const aut1 = instantiateModel("treeAutumn", 9.0, true);
+    if (aut1) {
+      aut1.position.set(6, 2.5, -17);
+      aut1.traverse((ch) => {
+        if (ch.isMesh && ch.material) ch.material.color.set(0xf59e0b);
+      });
+      station1Group.add(aut1);
+    }
+
+    // 7. Ground Animals (Bunnies grazing on the grass)
+    [[-4, 2.5, 3], [6, 2.5, 4], [-8, 2.5, -4], [2, 2.5, -8]].forEach((pos) => {
+      const b = createBunny();
+      b.position.set(pos[0], pos[1], pos[2]);
+      b.rotation.y = Math.random() * Math.PI * 2;
+      station1Group.add(b);
+      groundAnimals.push(b);
+    });
+
+    // 8. Fairies circling the Ferris Wheel & Carnival
+    for (let f = 0; f < 4; f++) {
+      const fairy = createFairy(f % 2 === 0 ? 0xec4899 : 0x38bdf8);
+      scene.add(fairy.group);
+      flyingFairies.push({
+        ...fairy,
+        centerX: 105 + 16,
+        centerY: 14 + 18,
+        centerZ: -145 - 6,
+        radius: 12.0 + f * 3.0,
+        speed: 0.0018 + f * 0.0004,
+        offset: f * 1.5,
+      });
+    }
+
+    // 9. Floating 3D Island Beacon
+    const b1 = createIslandBeacon("01 · Celestial Carnival & Observatory", 0xf59e0b);
+    b1.beacon.position.set(0, 32, 0);
+    station1Group.add(b1.beacon);
+    interactiveBeacons.push(b1);
+    clickTargets.push({ mesh: b1.gem, stationIdx: 1, name: "Celestial Carnival", type: "isle" });
 
     // Orbiting Brass Armillary Rings
     const armillaryGroup = new T.Group();
@@ -930,44 +1671,66 @@
 
     /* ═══════════════════════════════════════════════════════════════════
        STATION 3: 03 — CONSTELLATION (Twilight Starlight Skill Realm)
-       Floating clusters of luminous crystal geodes in zero-g with constellation lines.
+       Clear 3D Star Polyhedra & Radiant 3D Celestial Flowers floating in zero-g.
        ═══════════════════════════════════════════════════════════════════ */
     const station3Group = new T.Group();
     station3Group.position.set(-85, 55, -80);
     worldGroup.add(station3Group);
 
-    // Glowing Crystal Nodes
+    // 6 Master Celestial Skill Nodes (Alternating Clear 3D Spiked Stars & Radiant Flowers)
     const SKILLS = [
-      { name: "Python",     pos: [0, 8, 0],       color: 0x3b82f6 },
-      { name: "Three.js",   pos: [-14, 15, -6],   color: 0x10b981 },
-      { name: "React",      pos: [12, 18, 4],     color: 0x06b6d4 },
-      { name: "PyTorch",    pos: [-8, 26, -12],   color: 0xf97316 },
-      { name: "TypeScript", pos: [14, 28, -8],    color: 0x8b5cf6 },
-      { name: "GLSL",       pos: [0, 36, -4],     color: 0xec4899 },
+      { name: "Python",     type: "star",   pos: [0, 8, 0],       color: 0x38bdf8, spike: 4.8, core: 1.8 },
+      { name: "Three.js",   type: "flower", pos: [-14, 15, -6],   color: 0x34d399, scale: 2.8 },
+      { name: "React",      type: "star",   pos: [12, 18, 4],     color: 0x06b6d4, spike: 4.2, core: 1.6 },
+      { name: "PyTorch",    type: "flower", pos: [-8, 26, -12],   color: 0xfbbf24, scale: 2.6 },
+      { name: "TypeScript", type: "star",   pos: [14, 28, -8],    color: 0xa855f7, spike: 4.5, core: 1.7 },
+      { name: "GLSL",       type: "flower", pos: [0, 36, -4],     color: 0xf472b6, scale: 3.0 },
     ];
 
-    const crystalMat = new T.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 1.8,
-      roughness: 0.15,
-      metalness: 0.85,
-    });
-
-    const crystalMeshes = [];
     SKILLS.forEach((sk, i) => {
-      let cMesh = instantiateModel(`crystal${(i % 3) + 1}`, 3.8);
-      if (!cMesh) {
-        const cGeo = new T.OctahedronGeometry(2.5, 0);
-        cMesh = new T.Mesh(cGeo, crystalMat);
+      if (sk.type === "star") {
+        const star = create3DClearStar(sk.core, sk.spike, sk.color);
+        star.group.position.set(...sk.pos);
+        station3Group.add(star.group);
+        celestialStars.push({ ...star, baseY: sk.pos[1], seed: i * 2.1 });
+        floatingCrystals.push({ obj: star.group, baseY: sk.pos[1], seed: i * 2.1 });
+      } else {
+        const flower = create3DCelestialFlower(sk.scale, sk.color, 0xfef08a);
+        flower.group.position.set(...sk.pos);
+        station3Group.add(flower.group);
+        celestialFlowers.push({ ...flower, baseY: sk.pos[1], seed: i * 2.1 });
+        floatingCrystals.push({ obj: flower.group, baseY: sk.pos[1], seed: i * 2.1 });
       }
-      cMesh.position.set(sk.pos[0], sk.pos[1], sk.pos[2]);
-      station3Group.add(cMesh);
-      crystalMeshes.push(cMesh);
-      floatingCrystals.push({ obj: cMesh, baseY: sk.pos[1], seed: i * 2.3 });
     });
 
-    // Luminous Constellation Lines connecting skill nodes
+    // 10 Delicate Clear 3D Mini-Stars drifting in the surrounding starlight
+    const miniStarColors = [0x67e8f9, 0xf472b6, 0xfef08a, 0xa78bfa, 0x34d399];
+    for (let m = 0; m < 10; m++) {
+      const col = miniStarColors[m % miniStarColors.length];
+      const mini = create3DClearStar(0.7, 1.8, col);
+      const mx = (Math.random() - 0.5) * 36;
+      const my = 4 + Math.random() * 38;
+      const mz = (Math.random() - 0.5) * 32;
+      mini.group.position.set(mx, my, mz);
+      station3Group.add(mini.group);
+      celestialStars.push({ ...mini, baseY: my, seed: m * 3.7 });
+      floatingCrystals.push({ obj: mini.group, baseY: my, seed: m * 3.7 });
+    }
+
+    // 4 Drifting Celestial Blossom Flowers
+    for (let fl = 0; fl < 4; fl++) {
+      const flCol = fl % 2 === 0 ? 0xf472b6 : 0x38bdf8;
+      const flower = create3DCelestialFlower(1.6, flCol, 0xfffbeb);
+      const fx = (Math.random() - 0.5) * 32;
+      const fy = 6 + Math.random() * 32;
+      const fz = (Math.random() - 0.5) * 28;
+      flower.group.position.set(fx, fy, fz);
+      station3Group.add(flower.group);
+      celestialFlowers.push({ ...flower, baseY: fy, seed: fl * 4.2 });
+      floatingCrystals.push({ obj: flower.group, baseY: fy, seed: fl * 4.2 });
+    }
+
+    // Luminous Constellation Lines connecting skill stars and flowers
     const linePoints = [];
     for (let i = 0; i < SKILLS.length; i++) {
       const p1 = new T.Vector3(...SKILLS[i].pos);
@@ -983,13 +1746,13 @@
       color: 0x67e8f9,
       transparent: true,
       opacity: 0.75,
-      linewidth: 2,
+      blending: T.AdditiveBlending,
     });
     const constellationLines = new T.LineSegments(lineGeo, lineMat);
     station3Group.add(constellationLines);
 
-    // Starlight Fireflies drifting around crystals
-    const ffCount = 80;
+    // Starlight Fireflies drifting around stars & flowers
+    const ffCount = 90;
     const ffGeo = new T.BufferGeometry();
     const ffPos = new Float32Array(ffCount * 3);
     for (let f = 0; f < ffCount; f++) {
@@ -1128,39 +1891,93 @@
     rotatingElements.push({ obj: runeRing, speedX: 0, speedY: 0, speedZ: 0.015 });
 
     /* ═══════════════════════════════════════════════════════════════════
-       SOARING ANIMATED FAUNA & FLOCKING BIRDS
+       SOARING ANIMATED FAUNA (PROCEDURAL GULLS - ZERO SKINNING GLITCHES)
        ═══════════════════════════════════════════════════════════════════ */
-    if (GLTF_CACHE.bird) {
-      const birdScene = GLTF_CACHE.bird.scene;
-      const animations = GLTF_CACHE.bird.animations;
-
-      if (animations && animations.length > 0) {
-        birdMixer = new T.AnimationMixer(birdScene);
-        const action = birdMixer.clipAction(animations[0]);
-        action.play();
-      }
-
-      // Add 4 birds flying high in the sky far above islands
-      for (let b = 0; b < 4; b++) {
-        const birdClone = birdScene.clone(true);
-        birdClone.scale.set(0.0018, 0.0018, 0.0018); // Delicate soaring birds
-        birdClone.traverse((ch) => {
-          if (ch.isMesh) {
-            ch.castShadow = false;
-            ch.receiveShadow = false;
-            if (ch.material) ch.material.color.set(0xffffff);
-          }
-        });
-        scene.add(birdClone);
-        flyingBirds.push({
-          mesh: birdClone,
-          radius: 95.0 + b * 15.0,
-          speed: 0.0008 + b * 0.00015,
-          offset: b * 1.8,
-          baseY: 65.0 + b * 5.0,
-        });
-      }
+    for (let b = 0; b < 5; b++) {
+      const bird = createProceduralBird();
+      bird.group.scale.set(1.4, 1.4, 1.4);
+      scene.add(bird.group);
+      flyingBirds.push({
+        ...bird,
+        radius: 95.0 + b * 15.0,
+        speed: 0.0007 + b * 0.00012,
+        offset: b * 1.4,
+        baseY: 65.0 + b * 5.0,
+      });
     }
+
+    // Ground Animals & Fairies on Station 0 (Hero Isle)
+    [[-3, 11.2, 5], [2, 10.4, 7], [-6, 11.2, 2]].forEach((pos) => {
+      const b = createBunny();
+      b.position.set(pos[0], pos[1], pos[2]);
+      b.rotation.y = Math.random() * Math.PI * 2;
+      station0Group.add(b);
+      groundAnimals.push(b);
+    });
+
+    for (let f = 0; f < 3; f++) {
+      const fairy = createFairy(f === 0 ? 0x38bdf8 : (f === 1 ? 0xf59e0b : 0xec4899));
+      scene.add(fairy.group);
+      flyingFairies.push({
+        ...fairy,
+        centerX: -6.0,
+        centerY: 14.0,
+        centerZ: -3.5,
+        radius: 8.0 + f * 3.5,
+        speed: 0.002 + f * 0.0005,
+        offset: f * 2.1,
+      });
+    }
+
+    // Floating 3D Island Beacons (Click-to-fly & Details)
+    const b0 = createIslandBeacon("00 · The Hero Isle", 0x38bdf8);
+    b0.beacon.position.set(0, 24, 0);
+    station0Group.add(b0.beacon);
+    interactiveBeacons.push(b0);
+    clickTargets.push({ mesh: b0.gem, stationIdx: 0, name: "Hero Isle", type: "isle" });
+
+    const b2 = createIslandBeacon("02 · Shipped Archipelago", 0x10b981);
+    b2.beacon.position.set(0, 22, 0);
+    station2Group.add(b2.beacon);
+    interactiveBeacons.push(b2);
+    clickTargets.push({ mesh: b2.gem, stationIdx: 2, name: "Shipped Archipelago", type: "isle" });
+
+    const b3 = createIslandBeacon("03 · Starlight Constellation", 0x8b5cf6);
+    b3.beacon.position.set(0, 36, 0);
+    station3Group.add(b3.beacon);
+    interactiveBeacons.push(b3);
+    clickTargets.push({ mesh: b3.gem, stationIdx: 3, name: "Starlight Constellation", type: "isle" });
+
+    const b4 = createIslandBeacon("04 · Cosmic Portal", 0x06b6d4);
+    b4.beacon.position.set(0, 24, 0);
+    station4Group.add(b4.beacon);
+    interactiveBeacons.push(b4);
+    clickTargets.push({ mesh: b4.gem, stationIdx: 4, name: "Cosmic Portal", type: "isle" });
+
+    // 5 Magnificent Swimming Celestial Sky-Koi Fish ("fishes in the air")
+    const fishConfigs = [
+      { color: 0x38bdf8, cx: 35, cz: -60, baseY: 32, rx: 85, rz: 65, speed: 0.0012, offset: 0, scale: 1.3 },
+      { color: 0xf59e0b, cx: 70, cz: -110, baseY: 42, rx: 95, rz: 75, speed: 0.0009, offset: 1.8, scale: 1.5 },
+      { color: 0x10b981, cx: -25, cz: -70, baseY: 22, rx: 70, rz: 55, speed: 0.0015, offset: 3.2, scale: 1.1 },
+      { color: 0xec4899, cx: -45, cz: -120, baseY: 52, rx: 105, rz: 85, speed: 0.0008, offset: 4.5, scale: 1.6 },
+      { color: 0x8b5cf6, cx: 10, cz: -160, baseY: 65, rx: 90, rz: 70, speed: 0.0011, offset: 2.4, scale: 1.4 },
+    ];
+    fishConfigs.forEach((cfg) => {
+      const fish = createSkyFish(cfg.color, cfg.scale);
+      scene.add(fish.mesh);
+      swimmingFish.push({
+        ...fish,
+        centerX: cfg.cx,
+        centerZ: cfg.cz,
+        baseY: cfg.baseY,
+        radiusX: cfg.rx,
+        radiusZ: cfg.rz,
+        speed: cfg.speed,
+        offset: cfg.offset,
+        waveFreq: 2.0,
+        waveAmp: 6.0,
+      });
+    });
 
     // Mark ready
     window.__WORLD_LOADED = true;
@@ -1173,8 +1990,8 @@
   const CAMERA_WAYPOINTS = [
     // 00 — ISLE: Wide establishing view framing hero island, cottage, grand oak & waterfall
     { pos: new T.Vector3(-18, 28, 62),  target: new T.Vector3(4, 9, 0) },
-    // 01 — OBSERVATORY: Elevated view looking across the observatory spire & sakura blossoms
-    { pos: new T.Vector3(88, 42, -98),  target: new T.Vector3(105, 18, -145) },
+    // 01 — OBSERVATORY: Panoramic view framing the celestial carnival, ferris wheel & observatory spire
+    { pos: new T.Vector3(76, 52, -88),  target: new T.Vector3(112, 22, -145) },
     // 02 — ARCHIPELAGO: Panoramic downward view across the chain of islands & bridges
     { pos: new T.Vector3(-28, 38, -35), target: new T.Vector3(4, 18, -85) },
     // 03 — CONSTELLATION: Immersive starlight glide straight through the glowing crystals
@@ -1203,12 +2020,122 @@
     if (composer) composer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  // Mouse Parallax Offset
+  // Mouse Parallax & 360° Free Drag Orbit State
   const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
-  window.addEventListener("mousemove", (e) => {
-    mouse.targetX = (e.clientX / window.innerWidth - 0.5) * 4.0;
-    mouse.targetY = (e.clientY / window.innerHeight - 0.5) * 2.5;
+  let isDragging = false;
+  let dragMoved = false;
+  let prevPointer = { x: 0, y: 0 };
+  let orbitYaw = 0;
+  let orbitPitch = 0;
+  let targetOrbitYaw = 0;
+  let targetOrbitPitch = 0;
+  let zoomFactor = 1.0;
+  let targetZoomFactor = 1.0;
+
+  // Raycaster for 3D Island Beacons and Click Targets
+  const raycaster = new T.Raycaster();
+  const pointerNorm = new T.Vector2();
+  let hoveredTarget = null;
+  const hudTooltip = document.getElementById("world-hud-tooltip");
+
+  function handleRaycastHover(clientX, clientY) {
+    if (!camera || clickTargets.length === 0) return;
+    pointerNorm.x = (clientX / window.innerWidth) * 2 - 1;
+    pointerNorm.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointerNorm, camera);
+
+    const candidates = clickTargets.map((ct) => ct.mesh);
+    const hits = raycaster.intersectObjects(candidates, true);
+
+    if (hits.length > 0) {
+      const hitObj = hits[0].object;
+      const match = clickTargets.find((ct) => {
+        let cur = hitObj;
+        while (cur) {
+          if (cur === ct.mesh) return true;
+          cur = cur.parent;
+        }
+        return false;
+      });
+
+      if (match) {
+        hoveredTarget = match;
+        document.body.style.cursor = "pointer";
+        if (hudTooltip) {
+          hudTooltip.innerHTML = `<span class="hud-glyph">✦</span> <span class="hud-name">${match.name}</span> <span class="hud-action">[click to visit]</span>`;
+          hudTooltip.style.left = `${clientX + 16}px`;
+          hudTooltip.style.top = `${clientY + 16}px`;
+          hudTooltip.classList.add("visible");
+        }
+        return;
+      }
+    }
+
+    hoveredTarget = null;
+    document.body.style.cursor = "";
+    if (hudTooltip) {
+      hudTooltip.classList.remove("visible");
+    }
+  }
+
+  function handleRaycastClick(clientX, clientY) {
+    if (hoveredTarget && hoveredTarget.stationIdx !== undefined) {
+      if (window.__navigateToStation) {
+        window.__navigateToStation(hoveredTarget.stationIdx);
+      }
+    }
+  }
+
+  window.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button, a, input, .panel, #cmdk, .journey, .station-expand-pill")) return;
+    isDragging = true;
+    dragMoved = false;
+    prevPointer.x = e.clientX;
+    prevPointer.y = e.clientY;
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    mouse.targetX = (e.clientX / window.innerWidth - 0.5) * 3.5;
+    mouse.targetY = (e.clientY / window.innerHeight - 0.5) * 2.2;
+
+    if (isDragging) {
+      const dx = e.clientX - prevPointer.x;
+      const dy = e.clientY - prevPointer.y;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        dragMoved = true;
+        const hint = document.getElementById("orbit-hint");
+        if (hint) hint.classList.add("fade-out");
+      }
+      targetOrbitYaw -= dx * 0.0055;
+      targetOrbitPitch = Math.max(-0.75, Math.min(0.75, targetOrbitPitch + dy * 0.0045));
+      prevPointer.x = e.clientX;
+      prevPointer.y = e.clientY;
+    } else {
+      handleRaycastHover(e.clientX, e.clientY);
+    }
+  });
+
+  window.addEventListener("pointerup", (e) => {
+    if (isDragging) {
+      isDragging = false;
+      if (!dragMoved) {
+        handleRaycastClick(e.clientX, e.clientY);
+      }
+    }
+  });
+
+  window.addEventListener("wheel", (e) => {
+    if (e.target.closest("#cmdk, .mission-row")) return;
+    targetZoomFactor = Math.max(0.6, Math.min(1.5, targetZoomFactor + e.deltaY * 0.0007));
   }, { passive: true });
+
+  // Double click resets orbit view
+  window.addEventListener("dblclick", (e) => {
+    if (e.target.closest("button, a, input, .panel, #cmdk")) return;
+    targetOrbitYaw = 0;
+    targetOrbitPitch = 0;
+    targetZoomFactor = 1.0;
+  });
 
   /* ── 8. ANIMATION LOOP ─────────────────────────────────────────────── */
 
@@ -1241,13 +2168,31 @@
     currentPos.lerpVectors(wpA.pos, wpB.pos, easedT);
     currentLookAt.lerpVectors(wpA.target, wpB.target, easedT);
 
-    // Mouse parallax
+    // Mouse parallax interpolation
     mouse.x += (mouse.targetX - mouse.x) * 0.05;
     mouse.y += (mouse.targetY - mouse.y) * 0.05;
 
-    camera.position.copy(currentPos);
-    camera.position.x += mouse.x;
-    camera.position.y += -mouse.y;
+    // 360° Free Drag Orbit & Zoom interpolation
+    orbitYaw += (targetOrbitYaw - orbitYaw) * 0.08;
+    orbitPitch += (targetOrbitPitch - orbitPitch) * 0.08;
+    zoomFactor += (targetZoomFactor - zoomFactor) * 0.08;
+
+    // Base offset from lookAt target to camera waypoint
+    const baseOffset = new T.Vector3().subVectors(currentPos, currentLookAt);
+    const dist = baseOffset.length() * zoomFactor;
+
+    // Convert to spherical coords and apply 360° free orbit yaw and clamped pitch
+    const baseTheta = Math.atan2(baseOffset.x, baseOffset.z);
+    const basePhi = Math.acos(Math.max(-1, Math.min(1, baseOffset.y / baseOffset.length())));
+
+    const curTheta = baseTheta + orbitYaw;
+    const curPhi = Math.max(0.12, Math.min(Math.PI - 0.12, basePhi + orbitPitch));
+
+    const cx = currentLookAt.x + dist * Math.sin(curPhi) * Math.sin(curTheta);
+    const cy = currentLookAt.y + dist * Math.cos(curPhi);
+    const cz = currentLookAt.z + dist * Math.sin(curPhi) * Math.cos(curTheta);
+
+    camera.position.set(cx + mouse.x, cy - mouse.y, cz);
     camera.lookAt(currentLookAt);
 
     // Update animated shader materials (waterfall, caustics, foliage wind)
@@ -1257,10 +2202,9 @@
       }
     });
 
-    // Animate rotating elements
+    // Animate rotating elements (windmill, armillary, vortex)
     rotatingElements.forEach((item) => {
       if (item.rotateAxisY) {
-        // Horizontal shaft rotation (windmill blades)
         item.obj.rotateY(item.speed);
       } else if (item.rotateAxisZ) {
         item.obj.rotateZ(item.speed);
@@ -1271,26 +2215,102 @@
       }
     });
 
+    // Animate Carnival Rides (Ferris Wheel & Carousel)
+    carnivalRides.forEach((ride) => {
+      if (ride.wheelGroup) {
+        ride.wheelGroup.rotation.z += ride.speed;
+        if (ride.gondolas) {
+          ride.gondolas.forEach((g) => {
+            g.rotation.z = -ride.wheelGroup.rotation.z;
+          });
+        }
+      }
+      if (ride.rotGroup) {
+        ride.rotGroup.rotation.y += ride.speed;
+        if (ride.mounts) {
+          ride.mounts.forEach((m) => {
+            m.obj.position.y = m.baseY + Math.sin(elapsedTime * 3.5 + m.seed) * 0.35;
+          });
+        }
+      }
+    });
+
+    // Animate Swimming Celestial Sky-Koi Fish ("fishes in the air")
+    swimmingFish.forEach((fish) => {
+      const angle = elapsedTime * fish.speed * 60.0 + fish.offset;
+      const fx = fish.centerX + Math.cos(angle) * fish.radiusX;
+      const fz = fish.centerZ + Math.sin(angle) * fish.radiusZ;
+      const fy = fish.baseY + Math.sin(elapsedTime * fish.waveFreq + fish.offset) * fish.waveAmp;
+      fish.mesh.position.set(fx, fy, fz);
+      // Tangent direction
+      const dx = -Math.sin(angle) * fish.radiusX;
+      const dz = Math.cos(angle) * fish.radiusZ;
+      fish.mesh.rotation.y = Math.atan2(dx, dz) + Math.PI;
+      fish.mesh.rotation.z = Math.sin(elapsedTime * 2.8 + fish.offset) * 0.16;
+      if (fish.tailGroup) {
+        fish.tailGroup.rotation.y = Math.sin(elapsedTime * 7.5 + fish.offset) * 0.45;
+      }
+    });
+
+    // Animate Flying Fairies (fluttering wings)
+    flyingFairies.forEach((f) => {
+      const a = elapsedTime * f.speed * 60.0 + f.offset;
+      f.group.position.x = f.centerX + Math.cos(a) * f.radius;
+      f.group.position.z = f.centerZ + Math.sin(a) * f.radius;
+      f.group.position.y = f.centerY + Math.sin(elapsedTime * 3.2 + f.offset) * 1.6;
+      const flap = Math.sin(elapsedTime * 28.0) * 0.75;
+      f.wingL.rotation.y = flap;
+      f.wingR.rotation.y = -flap;
+    });
+
+    // Animate Ground Animals (Bunnies hopping)
+    groundAnimals.forEach((b, idx) => {
+      if (b.userData.baseY === undefined) b.userData.baseY = b.position.y;
+      const hop = Math.max(0, Math.sin(elapsedTime * 2.6 + idx * 1.7));
+      b.position.y = b.userData.baseY + hop * 0.22;
+    });
+
+    // Animate Interactive Beacons (Diamond Gems & Halos)
+    interactiveBeacons.forEach((b, idx) => {
+      b.gem.rotation.y += 0.02;
+      b.gem.rotation.x = Math.sin(elapsedTime * 1.8 + idx) * 0.2;
+      b.halo.rotation.z += 0.015;
+      b.halo.scale.setScalar(1.0 + Math.sin(elapsedTime * 2.4 + idx) * 0.1);
+    });
+
     // Animate floating crystals in zero-g
     floatingCrystals.forEach((item) => {
       item.obj.position.y = item.baseY + Math.sin(elapsedTime * 1.6 + item.seed) * 1.2;
       item.obj.rotation.y += 0.012;
     });
 
-    // Animate flying birds in circular flight paths
-    flyingBirds.forEach((b) => {
-      const angle = elapsedTime * b.speed * 120.0 + b.offset;
-      b.mesh.position.x = Math.cos(angle) * b.radius;
-      b.mesh.position.z = Math.sin(angle) * b.radius;
-      b.mesh.position.y = b.baseY + Math.sin(angle * 2.0) * 3.5;
-      // Face flight direction
-      b.mesh.rotation.y = -angle + Math.PI / 2;
+    // Animate Clear 3D Stars (rotation, refraction facets, core spin, halo ring)
+    celestialStars.forEach((star, idx) => {
+      star.group.rotation.y += 0.009;
+      star.group.rotation.x = Math.sin(elapsedTime * 1.2 + idx) * 0.15;
+      star.coreMesh.rotation.y -= 0.02;
+      star.ringMesh.rotation.z += 0.012;
     });
 
-    // Update skeletal bird animation
-    if (birdMixer) {
-      birdMixer.update(delta);
-    }
+    // Animate 3D Celestial Flowers (rotation and petal breathing/blooming)
+    celestialFlowers.forEach((fl, idx) => {
+      fl.group.rotation.y += 0.006;
+      fl.petals.forEach((p, pi) => {
+        p.rotation.x = -0.32 + Math.sin(elapsedTime * 2.2 + idx * 1.5 + pi) * 0.06;
+      });
+    });
+
+    // Animate procedural soaring birds (zero skinning glitches)
+    flyingBirds.forEach((b) => {
+      const angle = elapsedTime * b.speed * 120.0 + b.offset;
+      b.group.position.x = Math.cos(angle) * b.radius;
+      b.group.position.z = Math.sin(angle) * b.radius;
+      b.group.position.y = b.baseY + Math.sin(angle * 2.0) * 3.5;
+      b.group.rotation.y = -angle + Math.PI / 2;
+      const flap = Math.sin(elapsedTime * 6.5 + b.offset) * 0.45;
+      b.wingL.rotation.z = flap;
+      b.wingR.rotation.z = -flap;
+    });
 
     // Gentle cloud sea drift
     cloudSeaGroup.rotation.y = elapsedTime * 0.008;
