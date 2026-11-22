@@ -4,8 +4,8 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  --ink: rgba(15, 23, 42, 0.55);
-  --ink-strong: rgba(15, 23, 42, 0.68);
+  --ink: rgba(15, 23, 42, 0.32);
+  --ink-strong: rgba(15, 23, 42, 0.42);
   --line: rgba(147, 197, 253, 0.2);
   --line-strong: rgba(147, 197, 253, 0.38);
   --text: #f8fafc;
@@ -180,7 +180,7 @@ main { position: relative; z-index: 2; }
 .creed-mark { color: var(--cyan); }
 
 .hero-panel {
-  width: min(480px, 100%);
+  width: min(430px, 100%);
   background: var(--ink-strong);
 }
 .overline { font-size: 12.5px; color: var(--faint); letter-spacing: 3px; margin-bottom: 14px; }

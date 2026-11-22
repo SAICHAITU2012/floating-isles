@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>S. SADHASRI — THE FLOATING ISLES // An explorable 3D portfolio</title>
+  <title>S. SADHASRI — THE FLOATING REALM // An explorable fantasy 3D portfolio</title>
   <meta name="description" content="S. SadhaSri — full-stack engineer & ML enthusiast. An explorable floating-island world: scroll to fly between islands, missions, a skill constellation and a portal. 100% open source.">
   <meta name="theme-color" content="#0a0a18">
   <meta property="og:title" content="S. SADHASRI — THE FLOATING ISLES">
@@ -228,8 +228,20 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Three.js & Vendor Loaders -->
   <script src="three.min.js"></script>
+  <script src="DRACOLoader.js"></script>
+  <script src="GLTFLoader.js"></script>
+  <script src="postprocessing/Pass.js"></script>
+  <script src="postprocessing/CopyShader.js"></script>
+  <script src="postprocessing/LuminosityHighPassShader.js"></script>
+  <script src="postprocessing/ShaderPass.js"></script>
+  <script src="postprocessing/RenderPass.js"></script>
+  <script src="postprocessing/UnrealBloomPass.js"></script>
+  <script src="postprocessing/EffectComposer.js"></script>
+  
+  <!-- App & 3D World -->
+  <script src="app.js"></script>
   <script src="world.js"></script>
 </body>
 </html>
