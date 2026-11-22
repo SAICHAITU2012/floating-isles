@@ -641,28 +641,28 @@
     },
     { // 1 · CARNIVAL — radiant festival noon
       zenith: 0x0369a1, sky: 0x0894d3, horizon: 0x7dd3fc, fog: 0x93cdf2,
-      sunCol: 0xfffbe8, sunInt: 1.5, sunPos: [130, 170, -40], sunTarget: [240, 25, -160],
+      sunCol: 0xfffbe8, sunInt: 1.5, sunPos: [130, 170, -40], sunTarget: [135, 12, -95],
       hemiSky: 0x86ccff, hemiGnd: 0x62a06a, hemiInt: 0.85,
       bounce: 0.35, exposure: 1.0, bloom: 0.22, stars: 0.0,
       rainbowA: 0.85, rainbowN: 0.0,
     },
     { // 2 · ARCHIPELAGO — golden hour over the water (sun rides the camera side so isles glow warm, not silhouette)
       zenith: 0x1e4f9c, sky: 0x4a8fd4, horizon: 0xffd9a3, fog: 0xeec488,
-      sunCol: 0xffc98a, sunInt: 1.32, sunPos: [-330, 95, 60], sunTarget: [-220, 20, -140],
+      sunCol: 0xffc98a, sunInt: 1.32, sunPos: [-330, 95, 60], sunTarget: [-140, 8, -90],
       hemiSky: 0x9fb8e8, hemiGnd: 0x8a6b4a, hemiInt: 0.72,
       bounce: 0.3, exposure: 0.99, bloom: 0.3, stars: 0.0,
       rainbowA: 0.45, rainbowN: 0.15,
     },
     { // 3 · CONSTELLATION — twilight, the first stars
       zenith: 0x0b1026, sky: 0x171a3a, horizon: 0xc07a50, fog: 0x3b2f63,
-      sunCol: 0xd6e4ff, sunInt: 0.55, sunPos: [60, 130, -110], sunTarget: [-120, 80, -380],
+      sunCol: 0xd6e4ff, sunInt: 0.55, sunPos: [60, 130, -110], sunTarget: [-55, 40, -235],
       hemiSky: 0x2a3358, hemiGnd: 0x101423, hemiInt: 0.52,
       bounce: 0.16, exposure: 0.94, bloom: 0.56, stars: 1.0,
       rainbowA: 0.14, rainbowN: 1.0,
     },
     { // 4 · PORTAL — mystic night, the gate is lit (stone kept readable by moonlight)
       zenith: 0x05070f, sky: 0x0d1226, horizon: 0x2b2a5e, fog: 0x191b3a,
-      sunCol: 0xc7dcf8, sunInt: 0.6, sunPos: [-40, 120, -80], sunTarget: [0, 40, -560],
+      sunCol: 0xc7dcf8, sunInt: 0.6, sunPos: [-40, 120, -80], sunTarget: [5, 24, -360],
       hemiSky: 0x30396b, hemiGnd: 0x10142a, hemiInt: 0.64,
       bounce: 0.18, exposure: 0.95, bloom: 0.72, stars: 1.0,
       rainbowA: 0.0, rainbowN: 1.0,
@@ -700,13 +700,15 @@
     skyMat.uniforms.uFogColor.value.copy(lerpColor(journeyIdx, "fog", journeyT));
     skyMat.uniforms.uStars.value = lerpNum(journeyIdx, "stars", journeyT);
 
-    // Sun / moon — colour, strength and riding position
+    // Sun / moon — colour, strength and riding position (the sky-dome disc
+    // follows too, so the sun visibly sets during golden hour)
     skyMat.uniforms.uSunColor.value.copy(lerpColor(journeyIdx, "sunCol", journeyT));
     sunLight.color.copy(lerpColor(journeyIdx, "sunCol", journeyT));
     sunLight.intensity = lerpNum(journeyIdx, "sunInt", journeyT);
     _posA.fromArray(kfA.sunPos); _posB.fromArray(kfB.sunPos);
     _sunPos.lerpVectors(_posA, _posB, journeyT);
     sunLight.position.copy(_sunPos);
+    skyMat.uniforms.uSunDir.value.copy(_sunPos).normalize();
     _tgtA.fromArray(kfA.sunTarget); _tgtB.fromArray(kfB.sunTarget);
     _sunTgt.lerpVectors(_tgtA, _tgtB, journeyT);
     sunLight.target.position.copy(_sunTgt);
@@ -746,6 +748,7 @@
 
   // Cached loaded GLTF templates for cloning
   const GLTF_CACHE = {};
+  window.__gltfCache = GLTF_CACHE; // QA/debug: inspect model material names
   const MODEL_URLS = {
     island: "assets/models/island.glb",
     treeCommon1: "assets/models/tree_common_1.glb",
@@ -1681,16 +1684,16 @@
       const staffPivot = new T.Group();
       staffPivot.position.set(isLeft ? 0.95 : -0.95, 4.2, 0.8);
 
-      // 10.5m Tall Ornate Guardian Staff
-      const staffHaftGeo = new T.CylinderGeometry(0.12, 0.12, 11.0, 8);
+      // 13.5m Tall Ornate Guardian Staff (sized to the knight's full height)
+      const staffHaftGeo = new T.CylinderGeometry(0.14, 0.14, 13.5, 8);
       const staffHaftMat = new T.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.25 });
       const haft = new T.Mesh(staffHaftGeo, staffHaftMat);
-      haft.position.set(0, 5.2, 0);
+      haft.position.set(0, 6.4, 0);
       staffPivot.add(haft);
 
       // Glowing Runic Star Crystal at Staff Head
       const crystalHead = new T.Mesh(
-        new T.OctahedronGeometry(0.75, 0),
+        new T.OctahedronGeometry(0.85, 0),
         new T.MeshStandardMaterial({
           color: 0x38bdf8,
           emissive: 0x0284c7,
@@ -1698,7 +1701,7 @@
           roughness: 0.1,
         })
       );
-      crystalHead.position.set(0, 10.8, 0);
+      crystalHead.position.set(0, 13.4, 0);
       staffPivot.add(crystalHead);
 
       kGroup.add(staffPivot);
@@ -1710,12 +1713,14 @@
     left.kGroup.position.set(-7.5, 0, 0);
     // Crossed X barrier angle (points inward across gate center)
     left.staffPivot.rotation.z = -0.82;
+    left.staffPivot.userData.crossedZ = -0.82;
     group.add(left.kGroup);
 
     const right = createSingleKnight(false);
     right.kGroup.position.set(7.5, 0, 0);
     // Crossed X barrier angle (points inward across gate center)
     right.staffPivot.rotation.z = 0.82;
+    right.staffPivot.userData.crossedZ = 0.82;
     group.add(right.kGroup);
 
     return {
@@ -2743,6 +2748,9 @@
   const clickTargets = [];
   let waterfallMesh = null;
   let waterfallMat = null;
+  let portalStaffPivots = null; // guardian staffs — present arms on approach
+  let introT = STATIC || FORCED_STATION !== null ? 1 : 0; // opening dolly-in
+  const INTRO_FROM = new T.Vector3(-42, 74, 148);
   let waterfallParticles = null;
   let portalVortex = null;
 
@@ -2850,11 +2858,62 @@
 
     station0Group.add(upperCragGroup);
 
-    // 2. The Storybook Cottage atop the grassy crest (height 6.5 units)
-    attachModelSlot("cottage", station0Group, 6.8, false, (m) => {
-      m.position.set(-6.0, 11.0, -3.5);
-      m.rotation.set(0, 0.45, 0);
+    // 2. The Storybook Cottage on the open left flank of the crest —
+    // bigger, recoloured (cream walls, terracotta roof, honey timber,
+    // warmly lit windows) and grounded on a stone pad with a path
+    attachModelSlot("cottage", station0Group, 8.2, false, (m) => {
+      m.position.set(-10.5, 10.62, 2.0);
+      m.rotation.set(0, 0.7, 0);
+      // Elegant storybook repaint of the Kenney cottage palette
+      const repaint = {
+        "Plaster":     { c: 0xf6e7c6 },  // warm cream walls
+        "RoofTiles":   { c: 0xc2410c },  // vivid terracotta roof
+        "Wood":        { c: 0x8a5a2b },  // honey timber frame
+        "Wood_Side":   { c: 0x6b4423 },
+        "Wood_Light":  { c: 0xb47a2e },  // golden door & trim
+        "Windows":     { c: 0xfcd34d, e: 0xfbbf24, ei: 1.5 }, // cosy lamplight
+        "Stone_Light": { c: 0x94a3b8 },
+        "Stone_Dark":  { c: 0x64748b },
+        "Stone":       { c: 0x7c8899 },
+      };
+      m.traverse((ch) => {
+        if (ch.isMesh && ch.material) {
+          const r = repaint[ch.material.name];
+          if (r) {
+            ch.material.color.set(r.c);
+            if (r.e) {
+              ch.material.emissive.set(r.e);
+              ch.material.emissiveIntensity = r.ei;
+            }
+          }
+        }
+      });
+      clickTargets.push({ mesh: m, stationIdx: 0, name: "The Storybook Cottage", type: "house" });
     });
+
+    // Stone foundation pad + stepping-stone path (grounds the cottage naturally)
+    const padMat = new T.MeshStandardMaterial({ color: 0x8b9bad, roughness: 0.95, flatShading: true });
+    applyGhibliToon(padMat, { shadowTint: new T.Color(0x334155), rimColor: new T.Color(0xd7dee8) });
+    const cottagePad = new T.Mesh(new T.CylinderGeometry(3.6, 3.9, 0.55, 12), padMat);
+    cottagePad.position.set(-10.5, 10.35, 2.0);
+    cottagePad.receiveShadow = true;
+    cottagePad.castShadow = true;
+    station0Group.add(cottagePad);
+    [[-8.2, 3.4, 1.3], [-6.4, 4.4, 1.0], [-4.8, 5.6, 0.9]].forEach(([px, pz, pr], i) => {
+      const step = new T.Mesh(new T.CylinderGeometry(pr, pr + 0.12, 0.24, 7), padMat);
+      step.position.set(px, 10.42 + i * 0.008, pz);
+      step.rotation.y = i * 0.7;
+      step.receiveShadow = true;
+      station0Group.add(step);
+    });
+    // Flower beds hugging the pad + a lantern by the door
+    const cottageFlowersL = createFlowerPatch(1.5, 8);
+    cottageFlowersL.position.set(-12.6, 10.6, 3.6);
+    station0Group.add(cottageFlowersL);
+    const cottageFlowersR = createFlowerPatch(1.5, 8);
+    cottageFlowersR.position.set(-8.4, 10.6, 0.2);
+    station0Group.add(cottageFlowersR);
+    station0Group.add(makeLanternPost(-12.9, 0.6, 2.4));
 
     // 3. Majestic Grand Oak Tree sheltering the cottage (height 12 units)
     attachModelSlot("treeCommon1", station0Group, 12.5, true, (m) => {
@@ -2964,8 +3023,9 @@
       depthWrite: false,
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new T.Color(0x0284c7) },
-        uFoamColor: { value: new T.Color(0xe0f2fe) },
+        uColor: { value: new T.Color(0x0ea5e9) },
+        uFoamColor: { value: new T.Color(0xf0f9ff) },
+        uGlintColor: { value: new T.Color(0xfff7d6) },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -2978,20 +3038,52 @@
         uniform float uTime;
         uniform vec3 uColor;
         uniform vec3 uFoamColor;
+        uniform vec3 uGlintColor;
         varying vec2 vUv;
 
+        // Hash for sparkle glints
+        float hash12(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+
         void main() {
-          // Fast vertical scrolling water streaks
-          float streaks = sin(vUv.x * 24.0 + sin(vUv.y * 30.0 - uTime * 6.5));
-          streaks = smoothstep(0.2, 0.85, streaks);
+          float t = uTime;
 
-          // Foam crest at cliff lip
-          float lipFoam = smoothstep(0.08, 0.0, vUv.y);
+          // Three parallax layers of falling water bands — the far layer
+          // scrolls slower so the cascade has depth, not a flat wallpaper
+          float band1 = sin((vUv.x * 22.0) + sin(vUv.y * 26.0 - t * 7.0) + vUv.y * 4.0);
+          float band2 = sin((vUv.x * 34.0 + 1.7) + sin(vUv.y * 40.0 - t * 10.5));
+          float band3 = sin((vUv.x * 11.0 + 4.2) + sin(vUv.y * 18.0 - t * 5.0));
+          float flow = smoothstep(0.15, 0.9, band1) * 0.62
+                     + smoothstep(0.35, 0.95, band2) * 0.3
+                     + smoothstep(0.1, 0.8, band3) * 0.34;
 
-          vec3 finalCol = mix(uColor, uFoamColor, streaks * 0.65 + lipFoam * 0.5);
-          float alpha = mix(0.78, 0.95, streaks) * smoothstep(1.0, 0.85, vUv.y);
+          // Ropey streak texture that stretches as it falls (uv.y speeds up)
+          float streak = sin(vUv.x * 48.0 + sin(vUv.y * 9.0 - t * 3.0) * 2.4 - t * 13.0);
+          streak = smoothstep(0.55, 1.0, streak) * smoothstep(0.25, 0.75, vUv.y) * 0.35;
 
-          gl_FragColor = vec4(finalCol, alpha);
+          // Foam: churn at the cliff lip and bursting at the plunge pool
+          float lipFoam = smoothstep(0.10, 0.0, vUv.y) * (0.7 + 0.3 * sin(t * 9.0 + vUv.x * 40.0));
+          float baseFoam = smoothstep(0.86, 1.0, vUv.y) * (0.55 + 0.45 * sin(t * 7.0 + vUv.x * 30.0));
+
+          // Magical glints — tiny sparkles riding the water
+          vec2 gCell = vec2(vUv.x * 42.0, vUv.y * 60.0 - t * 14.0);
+          float g = hash12(floor(gCell));
+          float glint = step(0.985, g) * (0.5 + 0.5 * sin(t * 11.0 + g * 90.0));
+
+          vec3 col = uColor;
+          col = mix(col, uFoamColor, clamp(flow, 0.0, 1.0) * 0.55);
+          col = mix(col, uFoamColor, max(lipFoam, baseFoam) * 0.75);
+          col += streak * uFoamColor * 0.35;
+          col += glint * uGlintColor * 1.6;
+
+          float alpha = mix(0.72, 0.96, clamp(flow + streak, 0.0, 1.0));
+          alpha = max(alpha, max(lipFoam, baseFoam) * 0.9);
+          alpha *= smoothstep(1.02, 0.9, vUv.y); // fade at the very bottom seam
+
+          gl_FragColor = vec4(col, alpha);
         }
       `,
     });
@@ -3056,7 +3148,7 @@
        circus tent, magic fountain, balloon clusters, sakura trees & fairies!
        ═══════════════════════════════════════════════════════════════════ */
     const station1Group = new T.Group();
-    station1Group.position.set(240, 25, -160);
+    station1Group.position.set(135, 12, -95);
     worldGroup.add(station1Group);
 
     // Stratified Fantasy Peak for Observatory & Carnival
@@ -3169,9 +3261,9 @@
       scene.add(fairy.group);
       flyingFairies.push({
         ...fairy,
-        centerX: 105 + 16,
-        centerY: 14 + 18,
-        centerZ: -145 - 6,
+        centerX: 121,
+        centerY: 26,
+        centerZ: -95,
         radius: 12.0 + f * 3.0,
         speed: 0.0018 + f * 0.0004,
         offset: f * 1.5,
@@ -3210,17 +3302,18 @@
        Connected chain of islands hosting SadhaSri's 6 core projects.
        ═══════════════════════════════════════════════════════════════════ */
     const station2Group = new T.Group();
-    station2Group.position.set(-220, 20, -140);
+    station2Group.position.set(-140, 8, -90);
     worldGroup.add(station2Group);
 
-    // 6 Project Islands arranged in a sweeping crescent
+    // 6 Project Islands — one planned crescent, uniform ~17u spacing,
+    // gentle alternating heights so every isle reads against the golden sky
     const PROJECT_POSITIONS = [
-      { x: -38, y: 4, z: -18, label: "Generative UI Studio", color: 0x38bdf8 },
-      { x: -22, y: 0, z: -5,  label: "Web to Shell",          color: 0xa855f7 },
-      { x: -4,  y: 5, z: 12,  label: "Automations Agent",     color: 0xf59e0b },
-      { x: 15,  y: 1, z: 2,   label: "DNA Classifier",        color: 0x10b981 },
-      { x: 32,  y: 6, z: -14, label: "Anime Scenery Gen",     color: 0xec4899 },
-      { x: 48,  y: 2, z: -28, label: "Pi Pico Cluster",       color: 0x06b6d4 },
+      { x: -32, y: 2, z: 8,  label: "Generative UI Studio", color: 0x38bdf8 },
+      { x: -20, y: 0, z: -4, label: "Web to Shell",          color: 0xa855f7 },
+      { x: -4,  y: 4, z: -10, label: "Automations Agent",    color: 0xf59e0b },
+      { x: 12,  y: 1, z: -6, label: "DNA Classifier",        color: 0x10b981 },
+      { x: 26,  y: 3, z: 2,  label: "Anime Scenery Gen",     color: 0xec4899 },
+      { x: 38,  y: 1, z: 12, label: "Pi Pico Cluster",       color: 0x06b6d4 },
     ];
 
     PROJECT_POSITIONS.forEach((proj, idx) => {
@@ -3247,16 +3340,25 @@
       isleG.add(shrine);
       rotatingElements.push({ obj: shrine, speedX: 0.01, speedY: 0.02 * (idx % 2 === 0 ? 1 : -1) });
 
-      // Foliage / Pine tree per island
+      // Foliage / Pine tree per island (plus a smaller companion tree opposite)
       if (idx % 2 === 0) {
         attachModelSlot("treePine", isleG, 6.5, true, (pine) => {
           pine.position.set(3.5, 1.2, -2.5);
+        });
+        attachModelSlot("treeBirch", isleG, 4.2, true, (birch) => {
+          birch.position.set(-3.6, 1.15, -1.2);
         });
       } else {
         attachModelSlot("treeBirch", isleG, 6.0, true, (birch) => {
           birch.position.set(-3.2, 1.2, 2.0);
         });
+        attachModelSlot("treePine", isleG, 4.2, true, (pine) => {
+          pine.position.set(3.4, 1.15, 1.4);
+        });
       }
+
+      // Warm lantern post on the bridge-end of every mission isle
+      isleG.add(makeLanternPost(idx % 2 === 0 ? -5.4 : 5.4, idx % 2 === 0 ? -3.6 : 3.6, 2.3));
 
       // Connecting suspension bridge between adjacent islands
       if (idx < PROJECT_POSITIONS.length - 1) {
@@ -3422,19 +3524,98 @@
     station2Group.add(jumpingChild.group);
     window.__jumpingChild = jumpingChild;
 
-    // Animated Windmill at the center of the archipelago
-    const mill = instantiateModel("windmill", 11.5);
-    if (mill) {
-      mill.position.set(-4, 9.8, 12);
-      station2Group.add(mill);
+    // ── THE MILLER'S ISLE — windmill house isle at the crescent's heart ──
+    // Built with attachModelSlot so the windmill appears even when stations
+    // render before the model downloads (never silently vanishes again).
+    const millIsleG = new T.Group();
+    millIsleG.position.set(2, 0, 18);
+    station2Group.add(millIsleG);
 
+    const millIsland = createFantasyIsland(13.0, 20.0, 4, 0x57534e, 0x22c55e);
+    millIsland.position.y = 0.5;
+    millIsleG.add(millIsland);
+
+    attachModelSlot("windmill", millIsleG, 13.0, false, (mill) => {
+      mill.position.set(-1.5, 1.25, -2.5);
+      mill.rotation.set(0, -0.42, 0);
       // Find the Mill_Blades node so we can spin it around the HORIZONTAL shaft
       mill.traverse((ch) => {
         if (ch.name === "Mill_Blades") {
-          // The blades rotate naturally around the horizontal axle (local Y axis in model space)
           rotatingElements.push({ obj: ch, rotateAxisY: true, speed: 0.024 });
         }
       });
+      clickTargets.push({ mesh: mill, stationIdx: 2, name: "The Old Windmill", type: "mill" });
+    });
+
+    // Wooden dock reaching toward the viewer, far end overhanging the rim
+    attachModelSlot("dock", millIsleG, 4.2, false, (dock) => {
+      dock.position.set(3.2, 0.95, 12.4);
+      dock.rotation.set(0, 0.35, 0);
+    });
+
+    // Glowing lantern posts flanking the dock
+    function makeLanternPost(x, z, h = 2.6) {
+      const post = new T.Group();
+      const poleMat = new T.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9 });
+      applyGhibliToon(poleMat);
+      const pole = new T.Mesh(new T.CylinderGeometry(0.09, 0.12, h, 6), poleMat);
+      pole.position.y = h / 2;
+      pole.castShadow = true;
+      post.add(pole);
+      const lampMat = new T.MeshStandardMaterial({
+        color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 2.1, roughness: 0.4,
+      });
+      const lamp = new T.Mesh(new T.OctahedronGeometry(0.42, 0), lampMat);
+      lamp.position.y = h + 0.3;
+      post.add(lamp);
+      const capMat = new T.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
+      const cap = new T.Mesh(new T.ConeGeometry(0.42, 0.38, 6), capMat);
+      cap.position.y = h + 0.75;
+      post.add(cap);
+      post.position.set(x, 1.15, z);
+      return post;
+    }
+    millIsleG.add(makeLanternPost(-1.0, 9.0));
+    millIsleG.add(makeLanternPost(5.6, 10.2));
+
+    // Festive bunting strung between the lantern posts
+    millIsleG.add(createFestiveBunting(
+      new T.Vector3(-1.0, 4.6, 9.0),
+      new T.Vector3(5.6, 4.6, 10.2),
+      8
+    ));
+
+    // Miller's garden — flowers, mushrooms & two bunnies by the door
+    const millFlowers = createFlowerPatch(3.6, 16);
+    millFlowers.position.set(3.4, 1.1, 1.5);
+    millIsleG.add(millFlowers);
+    const millMush = createGlowingMushroomCluster(0xfbbf24, 4);
+    millMush.position.set(-4.6, 1.1, 2.2);
+    millIsleG.add(millMush);
+    [[-4.2, 1.1, 4.6], [4.8, 1.1, 4.2]].forEach((p, i) => {
+      const mb = createPlayfulBunny(i === 0 ? 0xffffff : 0xfef3c7);
+      mb.position.set(...p);
+      mb.rotation.y = Math.random() * Math.PI * 2;
+      millIsleG.add(mb);
+      groundAnimals.push(mb);
+    });
+
+    // Suspension bridge: miller's isle ↔ heart of the project crescent
+    {
+      const bridgeMat = new T.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.9 });
+      applyGhibliToon(bridgeMat);
+      const from = { x: 2, y: 2.4, z: 18 }, to = { x: -4, y: 6.4, z: -10 };
+      for (let p = 1; p < 10; p++) {
+        const t = p / 10;
+        const plank = new T.Mesh(new T.BoxGeometry(1.4, 0.25, 1.4), bridgeMat);
+        plank.position.set(
+          T.MathUtils.lerp(from.x, to.x, t),
+          T.MathUtils.lerp(from.y, to.y, t) - Math.sin(t * Math.PI) * 1.5,
+          T.MathUtils.lerp(from.z, to.z, t)
+        );
+        plank.lookAt(to.x, to.y, to.z);
+        station2Group.add(plank);
+      }
     }
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -3443,7 +3624,7 @@
        Spaced in an expansive celestial arch with vibrant colors and fluttering butterflies.
        ═══════════════════════════════════════════════════════════════════ */
     const station3Group = new T.Group();
-    station3Group.position.set(-120, 80, -380);
+    station3Group.position.set(-55, 40, -235);
     worldGroup.add(station3Group);
 
     // 7 Master Celestial Skill Nodes (Arranged in an expansive, balanced celestial arch)
@@ -3556,7 +3737,7 @@
        Ancient weathered stone ruin arch, swirling arcane energy vortex.
        ═══════════════════════════════════════════════════════════════════ */
     const station4Group = new T.Group();
-    station4Group.position.set(0, 40, -560);
+    station4Group.position.set(5, 24, -360);
     worldGroup.add(station4Group);
 
     // Ancient Ruin Stone Pillars Archway
@@ -3739,15 +3920,15 @@
       // Hero Realm
       { color: 0x38bdf8, cx: 20, cz: -30, baseY: 30, rx: 70, rz: 60, speed: 0.0012, offset: 0, scale: 1.4 },
       // Carnival Realm
-      { color: 0xf59e0b, cx: 230, cz: -150, baseY: 48, rx: 90, rz: 75, speed: 0.0010, offset: 1.8, scale: 1.6 },
+      { color: 0xf59e0b, cx: 143, cz: -95, baseY: 40, rx: 60, rz: 50, speed: 0.0010, offset: 1.8, scale: 1.6 },
       // Archipelago Realm
-      { color: 0x10b981, cx: -210, cz: -130, baseY: 38, rx: 85, rz: 70, speed: 0.0013, offset: 3.2, scale: 1.3 },
+      { color: 0x10b981, cx: -133, cz: -90, baseY: 32, rx: 55, rz: 46, speed: 0.0013, offset: 3.2, scale: 1.3 },
       // Constellation Realm
-      { color: 0xec4899, cx: -110, cz: -360, baseY: 95, rx: 110, rz: 90, speed: 0.0008, offset: 4.5, scale: 1.8 },
+      { color: 0xec4899, cx: -68, cz: -235, baseY: 78, rx: 75, rz: 60, speed: 0.0008, offset: 4.5, scale: 1.8 },
       // Portal Gateway
-      { color: 0x8b5cf6, cx: 15, cz: -540, baseY: 62, rx: 95, rz: 75, speed: 0.0011, offset: 2.4, scale: 1.5 },
+      { color: 0x8b5cf6, cx: 9, cz: -355, baseY: 50, rx: 62, rz: 50, speed: 0.0011, offset: 2.4, scale: 1.5 },
       // Inter-Realm Great Cosmic Voyager
-      { color: 0x06b6d4, cx: 0, cz: -260, baseY: 80, rx: 220, rz: 180, speed: 0.0006, offset: 5.1, scale: 2.0 },
+      { color: 0x06b6d4, cx: 0, cz: -175, baseY: 68, rx: 145, rz: 118, speed: 0.0006, offset: 5.1, scale: 2.0 },
     ];
     fishConfigs.forEach((cfg) => {
       const fish = createSkyFish(cfg.color, cfg.scale);
@@ -3767,6 +3948,56 @@
     });
 
     // ═══════════════════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════════════════════════════
+       WAYPOINT ISLES — small companion islands along the flight corridors,
+       so every leg of the journey has scenery drifting beneath the camera
+       and the realms read as one connected archipelago.
+       ═══════════════════════════════════════════════════════════════════ */
+    const WAYPOINT_ISLES = [
+      { pos: [72, -4, -48],   isle: [7.0, 12.0],  tree: "treePine",   h: 5.5, deco: "flowers" },
+      { pos: [-75, -2, -50],  isle: [6.0, 10.0],  tree: "treeBirch",  h: 5.0, deco: "rocks" },
+      { pos: [40, 6, -150],   isle: [5.5, 9.0],   tree: "treeAutumn", h: 4.5, deco: "flowers" },
+      { pos: [-100, 18, -168], isle: [7.0, 12.0], tree: "treePine",   h: 6.0, deco: "gems" },
+      { pos: [60, 12, -230],  isle: [5.0, 8.0],   tree: "treeBirch",  h: 4.2, deco: "rocks" },
+      { pos: [-28, 30, -300], isle: [6.0, 10.0],  tree: "treeAutumn", h: 4.8, deco: "gems" },
+    ];
+    WAYPOINT_ISLES.forEach((w, wi) => {
+      const wg = new T.Group();
+      wg.position.set(...w.pos);
+      worldGroup.add(wg);
+
+      const wIsle = createFantasyIsland(w.isle[0], w.isle[1], 3, 0x57534e, 0x22c55e);
+      wIsle.position.y = 0.3;
+      wg.add(wIsle);
+
+      attachModelSlot(w.tree === "treeAutumn" ? "treeAutumn" : w.tree, wg, w.h, true, (t) => {
+        t.position.set(0.6, 0.95, 0.2);
+        if (w.tree === "treeAutumn") styleAutumnTree(t, wi % 2 === 0 ? 0xf43f5e : 0xf59e0b);
+      });
+
+      if (w.deco === "flowers") {
+        const fp = createFlowerPatch(2.4, 10);
+        fp.position.set(-1.6, 0.85, -0.8);
+        wg.add(fp);
+      } else if (w.deco === "rocks") {
+        for (let rk = 0; rk < 3; rk++) {
+          const rGeo = new T.DodecahedronGeometry(0.5 + rk * 0.22, 0);
+          const rMesh = new T.Mesh(rGeo, rockMat);
+          rMesh.position.set(-1.4 + rk * 0.7, 0.85, -0.6 + rk * 0.5);
+          rMesh.rotation.set(rk * 1.3, rk * 0.7, rk * 0.4);
+          wg.add(rMesh);
+        }
+      } else {
+        const gemMat = new T.MeshStandardMaterial({
+          color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 2.0, roughness: 0.2,
+        });
+        const gem = new T.Mesh(new T.OctahedronGeometry(0.8, 0), gemMat);
+        gem.position.set(-1.2, 2.6, -0.6);
+        wg.add(gem);
+        rotatingElements.push({ obj: gem, speedY: 0.03 });
+      }
+    });
+
     // GUIDE GIRLS — Anime Characters on Each Island (Click for Details)
     // ═══════════════════════════════════════════════════════════════════
     const guideGirls = [];
@@ -3813,8 +4044,8 @@
       dressColor: 0x10b981, hairColor: 0x78350f, accentColor: 0x06b6d4,
       pose: "wave", scale: 1.35, stationIdx: 2,
     });
-    girl2.group.position.set(-3, 9.6, 7);
-    girl2.group.rotation.y = 0.4;
+    girl2.group.position.set(6.2, 1.35, 22.5);
+    girl2.group.rotation.y = -0.5;
     station2Group.add(girl2.group);
     guideGirls.push(girl2);
     clickTargets.push({ mesh: girl2.hitbox, stationIdx: 2, name: "✦ Meet Yuki — Click for Archipelago Dossier", type: "guide" });
@@ -3858,6 +4089,8 @@
     const guardians = createPortalGuardians();
     guardians.group.position.set(0, 0, 6);
     station4Group.add(guardians.group);
+    // The staffs part like a salute as the traveller nears the gate
+    portalStaffPivots = { left: guardians.leftPivot, right: guardians.rightPivot };
 
     // ═══════════════════════════════════════════════════════════════════
     // SKY VESSELS — Magnificent Hot Air Balloons & Fantasy Aeroplanes Fleet
@@ -3891,6 +4124,14 @@
       { colorA: 0x0d9488, colorB: 0xffedd5, colorStripe: 0xf97316, scale: 1.5, baseY: 200, centerX: 90, centerZ: -390, rx: 195, rz: 165, speed: 0.0006, phase: 0.9 },
     ];
 
+    // Re-fit the sky fleet to the tightened world map (orbits stay over land)
+    const SKY_FIT = 0.62;
+    const refitOrbit = (c) => {
+      c.centerX *= SKY_FIT; c.centerZ = -Math.abs(c.centerZ) * SKY_FIT - 40;
+      c.rx *= SKY_FIT; c.rz *= SKY_FIT;
+    };
+    balloonConfigs.forEach(refitOrbit);
+
     balloonConfigs.forEach((cfg) => {
       const b = createHotAirBalloon({
         colorA: cfg.colorA,
@@ -3923,6 +4164,8 @@
       // 5. Celestial Silver & Electric Cyan Horizon Cruiser (Grand Stratospheric Voyage)
       { colorBody: 0x0891b2, colorWing: 0xffffff, colorTrim: 0x06b6d4, scale: 1.95, altitude: 265, centerX: 0, centerZ: -280, rx: 350, rz: 310, speed: 0.0012, phase: 3.1 },
     ];
+
+    planeConfigs.forEach(refitOrbit);
 
     planeConfigs.forEach((pcfg) => {
       const plane = createFantasyAirplane(pcfg);
@@ -4015,13 +4258,13 @@
     // 00 — ISLE: Wide establishing view framing hero island, cottage, grand oak & waterfall
     { pos: new T.Vector3(-18, 28, 62),   target: new T.Vector3(4, 9, 0) },
     // 01 — OBSERVATORY: High & far enough back that the whole ferris wheel fits the frame
-    { pos: new T.Vector3(184, 78, -56), target: new T.Vector3(246, 28, -162) },
+    { pos: new T.Vector3(79, 65, 9),    target: new T.Vector3(141, 15, -97) },
     // 02 — ARCHIPELAGO: Low golden-hour panorama across the suspension-bridge chain
-    { pos: new T.Vector3(-274, 36, -74), target: new T.Vector3(-210, 16, -142) },
+    { pos: new T.Vector3(-194, 24, -24), target: new T.Vector3(-130, 4, -92) },
     // 03 — CONSTELLATION: Immersive starlight glide straight through the glowing crystals
-    { pos: new T.Vector3(-120, 115, -315), target: new T.Vector3(-120, 108, -380) },
+    { pos: new T.Vector3(-55, 75, -170), target: new T.Vector3(-55, 68, -235) },
     // 04 — PORTAL: Elevated eye-level view directly into the stone rune gate and vortex
-    { pos: new T.Vector3(0, 52, -520),   target: new T.Vector3(0, 44, -560) },
+    { pos: new T.Vector3(5, 36, -320),   target: new T.Vector3(5, 28, -360) },
   ];
 
   let currentStationProgress = FORCED_STATION !== null ? FORCED_STATION : 0;
@@ -4336,6 +4579,23 @@
 
     camera.position.set(cx + mouse.x, cy - mouse.y, cz);
     camera.lookAt(currentLookAt);
+
+    // Opening dolly-in: a slow establishing sweep from high over the cloud
+    // sea down into the hero framing — then the journey is yours
+    if (introT < 1) {
+      introT = Math.min(1, introT + delta / 3.4);
+      const e = 1 - Math.pow(1 - introT, 3);
+      camera.position.lerpVectors(INTRO_FROM, camera.position, e);
+    }
+
+    // Guardian salute: the crossed staffs swing fully upright as the
+    // traveller nears the gate, opening the way (and a gentle hum of light)
+    if (portalStaffPivots) {
+      const near = Math.min(Math.max((currentStationProgress - 3.45) / 0.5, 0), 1);
+      const open = near * near * (3 - 2 * near); // smoothstep
+      portalStaffPivots.left.rotation.z = portalStaffPivots.left.userData.crossedZ * (1 - open) + (-0.05) * open;
+      portalStaffPivots.right.rotation.z = portalStaffPivots.right.userData.crossedZ * (1 - open) + (0.05) * open;
+    }
 
     // Keep sky dome centered on camera so sky is infinite and seamless everywhere
     if (typeof skyDome !== "undefined" && skyDome) {
