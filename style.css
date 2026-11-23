@@ -1201,3 +1201,6 @@ body:has(#boot:not(.done)) .station-expand-pill,
 body:has(#boot:not(.done)) #orbit-hint,
 body:has(#boot:not(.done)) .journey,
 body:has(#boot:not(.done)) .scroll-cue { opacity: 0 !important; pointer-events: none !important; }
+
+/* touch: vertical swipes still drive the story, drags orbit, pinch zooms */
+#world { touch-action: pan-y; }

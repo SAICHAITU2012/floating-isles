@@ -186,25 +186,75 @@
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
-  /* ── 6 · audio — Ghibli ambient soundtrack & chime engine ──── */
+  /* ── 6 · audio — a living ambient score ───────────────────────
+     A generative score, no audio files to download: warm pads, gentle
+     bells, a soft wind bed and a low drone, played through a real
+     convolution reverb. The harmony and register change with the realm
+     you are standing in, so the music always fits what you are looking at.
+     ─────────────────────────────────────────────────────────────── */
 
   let audioCtx = null;
   let masterGain = null;
+  let reverbIn = null;
+  let delayIn = null;
+  let windGain = null;
   let isAudioPlaying = false;
   let musicTimer = null;
   let chordIdx = 0;
   let audioUserEnabled = localStorage.getItem("floating_realm_audio") !== "muted";
+  let mood = 0;                 // 0 isle · 1 observatory · 2 archipelago · 3 constellation · 4 portal
+  let moodOffset = 0;           // semitone transposition for the current realm
+  let moodSparse = 1;           // note density multiplier
 
-  const CHORDS = [
-    // 0: Cmaj9 — wonder & sunrise
-    { bass: 130.81, notes: [261.63, 329.63, 392.00, 493.88, 587.33, 659.25] },
-    // 1: Am9 — airy & nostalgic
-    { bass: 110.00, notes: [220.00, 261.63, 329.63, 392.00, 493.88, 523.25] },
-    // 2: Fmaj7 — gentle ascending dream
-    { bass: 87.31,  notes: [174.61, 261.63, 329.63, 349.23, 440.00, 523.25] },
-    // 3: Gsus4 / G6 — expansive open sky
-    { bass: 98.00,  notes: [196.00, 293.66, 392.00, 440.00, 493.88, 587.33] },
+  const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  // Six-chord "wonder" progression, roots in semitones from C, chord tones
+  // above the root. Warm, open, unashamedly hopeful.
+  const PROGRESSION = [
+    { root: 0,  tones: [0, 4, 7, 11, 14] },   // Cmaj9 — sunrise
+    { root: 7,  tones: [0, 4, 7, 10, 14] },   // G6/9 — open sky
+    { root: -3, tones: [0, 3, 7, 10, 14] },   // Am9 — nostagic air
+    { root: 5,  tones: [0, 4, 7, 11, 16] },   // Fmaj7#11 — lift
+    { root: -5, tones: [0, 3, 7, 10, 14] },   // Dm9 — soft ache
+    { root: 2,  tones: [0, 4, 7, 11, 15] },   // Dmaj7 — bright turn home
   ];
+
+  // Each realm gets its own colour: transposition and how busy the melody is.
+  const MOODS = {
+    0: { offset: 0,  sparse: 1.0,  pad: 0.05,   bells: 0.055 }, // floating isle
+    1: { offset: 2,  sparse: 1.15, pad: 0.045,  bells: 0.06  }, // observatory / carnival
+    2: { offset: -2, sparse: 0.95, pad: 0.05,   bells: 0.05  }, // archipelago
+    3: { offset: 7,  sparse: 0.7,  pad: 0.038,  bells: 0.062 }, // constellation — high & airy
+    4: { offset: -5, sparse: 0.8,  pad: 0.055,  bells: 0.045 }, // portal — low & mysterious
+  };
+
+  function makeReverbIR(seconds = 3.4, decay = 2.6) {
+    const rate = audioCtx.sampleRate;
+    const len = Math.floor(rate * seconds);
+    const ir = audioCtx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay) * (1 - t * 0.2);
+      }
+    }
+    return ir;
+  }
+
+  function makeWindBuffer() {
+    const rate = audioCtx.sampleRate;
+    const len = Math.floor(rate * 4);
+    const buf = audioCtx.createBuffer(1, len, rate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;   // brown-ish noise, soft and airy
+      d[i] = last * 3.2;
+    }
+    return buf;
+  }
 
   function initAudio() {
     if (audioCtx) return;
@@ -212,117 +262,243 @@
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       audioCtx = new AudioContextClass();
 
-      // Master output with gentle limiter
       masterGain = audioCtx.createGain();
       masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
 
-      // Warm feedback delay for spacious ambient reverberation
-      const delay = audioCtx.createDelay();
-      delay.delayTime.value = 0.38;
-      const feedback = audioCtx.createGain();
-      feedback.gain.value = 0.32;
-      const delayFilter = audioCtx.createBiquadFilter();
-      delayFilter.type = "lowpass";
-      delayFilter.frequency.value = 2200;
+      // gentle safety limiter
+      const comp = audioCtx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.knee.value = 24;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.004;
+      comp.release.value = 0.25;
+      masterGain.connect(comp);
+      comp.connect(audioCtx.destination);
 
-      delay.connect(feedback);
-      feedback.connect(delayFilter);
-      delayFilter.connect(delay);
+      // real reverb
+      const conv = audioCtx.createConvolver();
+      conv.buffer = makeReverbIR();
+      const wet = audioCtx.createGain();
+      wet.gain.value = 0.85;
+      reverbIn = audioCtx.createGain();
+      reverbIn.connect(conv);
+      conv.connect(wet);
+      wet.connect(masterGain);
+
+      // long, dark echo for the bells
+      const delay = audioCtx.createDelay();
+      delay.delayTime.value = 0.42;
+      const fb = audioCtx.createGain();
+      fb.gain.value = 0.3;
+      const dFilter = audioCtx.createBiquadFilter();
+      dFilter.type = "lowpass";
+      dFilter.frequency.value = 2400;
+      delayIn = audioCtx.createGain();
+      delayIn.connect(delay);
+      delay.connect(fb);
+      fb.connect(dFilter);
+      dFilter.connect(delay);
       delay.connect(masterGain);
 
-      masterGain.connect(audioCtx.destination);
-      window.__audioDelay = delay;
+      // continuous wind bed with a slow swell
+      const windSrc = audioCtx.createBufferSource();
+      windSrc.buffer = makeWindBuffer();
+      windSrc.loop = true;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 620;
+      bp.Q.value = 0.55;
+      windGain = audioCtx.createGain();
+      windGain.gain.value = 0.0;
+      windSrc.connect(bp);
+      bp.connect(windGain);
+      windGain.connect(masterGain);
+      windSrc.start();
+      const lfo = audioCtx.createOscillator();
+      const lfoGain = audioCtx.createGain();
+      lfo.frequency.value = 0.045;
+      lfoGain.gain.value = 0.012;
+      lfo.connect(lfoGain);
+      lfoGain.connect(windGain.gain);
+      lfo.start();
+
+      window.__audioDelay = delayIn;
     } catch (e) {
       console.warn("Web Audio not supported:", e);
     }
   }
 
-  function playPianoNote(freq, time, duration = 2.4, velocity = 0.08) {
-    if (!audioCtx || !masterGain) return;
+  // Warm pad: three slightly detuned triangles behind a moving lowpass.
+  function padVoice(freq, time, duration = 7.0, velocity = 0.04) {
+    if (!audioCtx) return;
     try {
-      const osc1 = audioCtx.createOscillator();
-      const osc2 = audioCtx.createOscillator();
-      const noteGain = audioCtx.createGain();
-      const filter = audioCtx.createBiquadFilter();
+      const g = audioCtx.createGain();
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(700, time);
+      lp.frequency.linearRampToValueAtTime(1500, time + duration * 0.35);
+      lp.frequency.linearRampToValueAtTime(760, time + duration);
 
-      osc1.type = "triangle";
-      osc1.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(velocity, time + duration * 0.25);
+      g.gain.linearRampToValueAtTime(velocity * 0.75, time + duration * 0.7);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
 
-      osc2.type = "sine";
-      osc2.frequency.setValueAtTime(freq * 2.002, time);
-
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(Math.min(freq * 3.5, 3400), time);
-      filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.2, 300), time + duration);
-
-      noteGain.gain.setValueAtTime(0, time);
-      noteGain.gain.linearRampToValueAtTime(velocity, time + 0.02);
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(noteGain);
-      noteGain.connect(masterGain);
-      if (window.__audioDelay) noteGain.connect(window.__audioDelay);
-
-      osc1.start(time);
-      osc2.start(time);
-      osc1.stop(time + duration);
-      osc2.stop(time + duration);
+      [-6, 0, 6].forEach((cents) => {
+        const o = audioCtx.createOscillator();
+        o.type = "triangle";
+        o.frequency.setValueAtTime(freq, time);
+        o.detune.setValueAtTime(cents, time);
+        o.connect(lp);
+        o.start(time);
+        o.stop(time + duration + 0.1);
+      });
+      lp.connect(g);
+      g.connect(masterGain);
+      if (reverbIn) g.connect(reverbIn);
     } catch (e) {}
   }
 
-  function playAmbientPad(freq, time, duration = 5.2, velocity = 0.035) {
-    if (!audioCtx || !masterGain) return;
+  // Glass bell: a sine carrier FM'd by a fast harmonic — the sound of the
+  // constellation realm, and of the little chimes on hover.
+  function bellVoice(freq, time, duration = 3.0, velocity = 0.05) {
+    if (!audioCtx) return;
     try {
-      const osc = audioCtx.createOscillator();
-      const padGain = audioCtx.createGain();
-      const padFilter = audioCtx.createBiquadFilter();
+      const carrier = audioCtx.createOscillator();
+      const mod = audioCtx.createOscillator();
+      const modGain = audioCtx.createGain();
+      const g = audioCtx.createGain();
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, time);
+      carrier.type = "sine";
+      carrier.frequency.setValueAtTime(freq, time);
+      mod.type = "sine";
+      mod.frequency.setValueAtTime(freq * 3.01, time);
+      modGain.gain.setValueAtTime(freq * 1.6, time);
+      modGain.gain.exponentialRampToValueAtTime(1, time + duration * 0.55);
+      mod.connect(modGain);
+      modGain.connect(carrier.frequency);
 
-      padFilter.type = "lowpass";
-      padFilter.frequency.setValueAtTime(800, time);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(velocity, time + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
 
-      padGain.gain.setValueAtTime(0, time);
-      padGain.gain.linearRampToValueAtTime(velocity, time + 1.2);
-      padGain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+      carrier.connect(g);
+      g.connect(masterGain);
+      if (reverbIn) g.connect(reverbIn);
+      if (delayIn) g.connect(delayIn);
 
-      osc.connect(padFilter);
-      padFilter.connect(padGain);
-      padGain.connect(masterGain);
-
-      osc.start(time);
-      osc.stop(time + duration);
+      carrier.start(time); mod.start(time);
+      carrier.stop(time + duration); mod.stop(time + duration);
     } catch (e) {}
+  }
+
+  // Soft plucked string for the arpeggios.
+  function pluckVoice(freq, time, duration = 2.6, velocity = 0.045) {
+    if (!audioCtx) return;
+    try {
+      const o = audioCtx.createOscillator();
+      const o2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const lp = audioCtx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(Math.min(freq * 4, 3600), time);
+      lp.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.4, 320), time + duration);
+
+      o.type = "triangle"; o.frequency.setValueAtTime(freq, time);
+      o2.type = "sine"; o2.frequency.setValueAtTime(freq * 2.004, time);
+
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(velocity, time + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+      o.connect(lp); o2.connect(lp);
+      lp.connect(g);
+      g.connect(masterGain);
+      if (reverbIn) g.connect(reverbIn);
+      if (delayIn) g.connect(delayIn);
+      o.start(time); o2.start(time);
+      o.stop(time + duration); o2.stop(time + duration);
+    } catch (e) {}
+  }
+
+  function subVoice(freq, time, duration = 9.0) {
+    if (!audioCtx) return;
+    try {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(0.045, time + 2.0);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+      o.connect(g); g.connect(masterGain);
+      o.start(time); o.stop(time + duration);
+    } catch (e) {}
+  }
+
+  function moodSettings() {
+    return MOODS[mood] || MOODS[0];
   }
 
   function scheduleNextPhrase() {
     if (!isAudioPlaying || !audioCtx) return;
-    const now = audioCtx.currentTime;
-    const chord = CHORDS[chordIdx % CHORDS.length];
+    const now = audioCtx.currentTime + 0.06;
+    const cfg = moodSettings();
+    moodOffset = cfg.offset;
+    const chord = PROGRESSION[chordIdx % PROGRESSION.length];
     chordIdx++;
 
-    // 1. Warm bass pad
-    playAmbientPad(chord.bass, now, 6.2, 0.04);
-    playAmbientPad(chord.bass * 1.5, now + 0.1, 5.8, 0.025);
+    const rootMidi = 60; // C4
+    const chordMidis = chord.tones.map((t) => rootMidi + chord.root + t + moodOffset);
 
-    // 2. Delicate piano arpeggios (Ghibli pentatonic style)
-    const arpeggioNotes = [...chord.notes].sort(() => Math.random() - 0.5).slice(0, 4);
-    arpeggioNotes.forEach((freq, idx) => {
-      const noteTime = now + 0.15 + idx * 0.55 + Math.random() * 0.15;
-      playPianoNote(freq, noteTime, 3.2, 0.06);
-    });
+    // 1. pad bed — root, fifth and the chord's colour tone, spread wide
+    const bass = midiToFreq(chordMidis[0] - 12);
+    padVoice(bass, now, 8.2, cfg.pad);
+    padVoice(midiToFreq(chordMidis[0]), now + 0.15, 7.6, cfg.pad * 0.75);
+    padVoice(midiToFreq(chordMidis[2]), now + 0.3, 7.4, cfg.pad * 0.6);
+    padVoice(midiToFreq(chordMidis[3]), now + 0.45, 7.0, cfg.pad * 0.45);
+    subVoice(bass / 2, now, 9.5);
 
-    // 3. High celestial sparkle chime
-    if (Math.random() > 0.35) {
-      const chimeFreq = chord.notes[Math.floor(Math.random() * chord.notes.length)] * 2;
-      playPianoNote(chimeFreq, now + 2.4 + Math.random() * 0.8, 4.0, 0.03);
+    // 2. arpeggio — chord tones plus the ninth, gently humanised
+    const arpPool = [...chordMidis, chordMidis[0] + 12, chordMidis[2] + 12];
+    const arpCount = Math.max(3, Math.round(5 * cfg.sparse));
+    for (let i = 0; i < arpCount; i++) {
+      const f = midiToFreq(arpPool[(i * 2 + chordIdx) % arpPool.length]);
+      const t = now + 0.4 + i * (0.62 + Math.random() * 0.16);
+      pluckVoice(f, t, 2.8, cfg.bells);
     }
 
-    musicTimer = setTimeout(scheduleNextPhrase, 3600);
+    // 3. a bell melody that drifts over the top
+    if (Math.random() < 0.85) {
+      const steps = [2, 3, 4, 4, 3, 2];
+      const n = steps[chordIdx % steps.length];
+      bellVoice(midiToFreq(chordMidis[n] + 12), now + 1.4 + Math.random() * 1.2, 3.6, cfg.bells * 0.85);
+    }
+    if (Math.random() < 0.4) {
+      bellVoice(midiToFreq(chordMidis[1] + 24), now + 4.0 + Math.random() * 1.6, 4.2, cfg.bells * 0.5);
+    }
+
+    musicTimer = setTimeout(scheduleNextPhrase, 6600);
   }
+
+  function setMood(idx) {
+    if (idx === mood) return;
+    mood = Math.max(0, Math.min(4, idx | 0));
+    // fade the wind bed a little in the big open realms
+    if (windGain && audioCtx) {
+      const target = mood === 3 ? 0.05 : mood === 4 ? 0.075 : 0.03;
+      windGain.gain.linearRampToValueAtTime(target, audioCtx.currentTime + 2.5);
+    }
+  }
+  window.__setMusicMood = setMood;
+
+  // follow the realm the visitor is standing in
+  setInterval(() => {
+    if (typeof window.__getCurrentProgress !== "function") return;
+    const p = window.__getCurrentProgress();
+    if (typeof p !== "number" || !isFinite(p)) return;
+    setMood(Math.round(p));
+  }, 1600);
 
   function startSoundtrack() {
     initAudio();
@@ -333,7 +509,8 @@
 
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(0.24, audioCtx.currentTime + 2.5);
+    masterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 3.0);
+    if (windGain) windGain.gain.linearRampToValueAtTime(mood === 3 ? 0.05 : 0.03, audioCtx.currentTime + 4.0);
 
     scheduleNextPhrase();
     updateAudioButtonUI(true);
@@ -345,7 +522,8 @@
     clearTimeout(musicTimer);
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+    masterGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.4);
+    if (windGain) windGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.4);
     updateAudioButtonUI(false);
   }
 
@@ -364,22 +542,33 @@
   function updateAudioButtonUI(playing) {
     const btn = document.getElementById("audio-toggle");
     if (!btn) return;
+    const label = btn.querySelector(".audio-label");
     if (playing) {
       btn.classList.add("playing");
-      btn.querySelector(".audio-label").textContent = "sound: on";
+      btn.setAttribute("aria-pressed", "true");
+      if (label) label.textContent = "sound: on";
     } else {
       btn.classList.remove("playing");
-      btn.querySelector(".audio-label").textContent = "sound: off";
+      btn.setAttribute("aria-pressed", "false");
+      if (label) label.textContent = "sound: off";
     }
   }
+
+  // tiny hook so the QA harness can prove the score is really running
+  window.__audioState = () => ({
+    playing: isAudioPlaying,
+    ctx: audioCtx ? audioCtx.state : "none",
+    mood,
+    offset: moodOffset,
+  });
 
   function playChime(mult = 1) {
     initAudio();
     if (!audioCtx) return;
     if (audioCtx.state !== "running") audioCtx.resume();
-    const notes = [220.0, 261.63, 293.66, 329.63, 392.0];
+    const notes = [220.0, 261.63, 293.66, 329.63, 392.0, 523.25];
     const freq = notes[Math.floor(Math.random() * notes.length)] * mult;
-    playPianoNote(freq, audioCtx.currentTime, 1.4, 0.08);
+    bellVoice(freq, audioCtx.currentTime, 1.6, 0.07);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -388,18 +577,36 @@
     updateAudioButtonUI(audioUserEnabled);
   });
 
-  // Autoplay compliance: smoothly trigger audio upon first user gesture if enabled
-  const userGestureHandler = () => {
-    if (audioUserEnabled && !isAudioPlaying) {
-      startSoundtrack();
-    }
-    window.removeEventListener("click", userGestureHandler);
-    window.removeEventListener("scroll", userGestureHandler);
-    window.removeEventListener("keydown", userGestureHandler);
+  // Autoplay compliance: unlock the score on the first real gesture, on every
+  // device (desktop click/keypress, iOS touchstart/touchend).
+  let audioUnlocked = false;
+  const unlockAudio = () => {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    if (audioUserEnabled && !isAudioPlaying) startSoundtrack();
+    ["click", "keydown", "touchend", "scroll"].forEach((ev) =>
+      window.removeEventListener(ev, unlockAudio));
   };
-  window.addEventListener("click", userGestureHandler, { once: true });
-  window.addEventListener("scroll", userGestureHandler, { once: true });
-  window.addEventListener("keydown", userGestureHandler, { once: true });
+  ["click", "keydown", "touchend", "scroll"].forEach((ev) =>
+    window.addEventListener(ev, unlockAudio, { passive: true }));
+
+  // Some browsers (notably iOS) suspend the context again after the tab
+  // regains focus; nudge it back so the score never silently dies.
+  setInterval(() => {
+    if (isAudioPlaying && audioCtx && audioCtx.state !== "running" && !document.hidden) {
+      audioCtx.resume().catch(() => {});
+    }
+  }, 3000);
+
+  // Never drain a battery in a background tab.
+  document.addEventListener("visibilitychange", () => {
+    if (!audioCtx) return;
+    if (document.hidden) {
+      audioCtx.suspend();
+    } else if (isAudioPlaying) {
+      audioCtx.resume();
+    }
+  });
 
   /* ── 7 · ⌘K course-plotter ──────────────────────────────────── */
 
