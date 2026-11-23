@@ -3094,13 +3094,10 @@
       rotatingElements.push({ obj: shard, speedY: 0, bobAmp: 0.5 + i * 0.2, bobSpeed: 0.00035 + i * 0.00008, seed: i * 2.1, baseY: y });
     });
 
-    // 2. The Storybook Cottage on the open left flank of the crest —
-    // bigger, recoloured (cream walls, terracotta roof, honey timber,
-    // warmly lit windows) and grounded on a stone pad with a path
-    attachModelSlot("cottage", station0Group, 8.2, false, (m) => {
-      m.position.set(-10.5, 10.62, 2.0);
-      m.rotation.set(0, 0.7, 0);
-      // Elegant storybook repaint of the Kenney cottage palette
+    // Storybook repaint shared by every cottage instance (hero isle,
+    // under-isle hut, neighbour isle) — cream walls, terracotta roof,
+    // honey timber, warmly lit windows.
+    function repaintStorybookCottage(root) {
       const repaint = {
         "Plaster":     { c: 0xf6e7c6 },  // warm cream walls
         "RoofTiles":   { c: 0xc2410c },  // vivid terracotta roof
@@ -3112,7 +3109,7 @@
         "Stone_Dark":  { c: 0x64748b },
         "Stone":       { c: 0x7c8899 },
       };
-      m.traverse((ch) => {
+      root.traverse((ch) => {
         if (ch.isMesh && ch.material) {
           const r = repaint[ch.material.name];
           if (r) {
@@ -3124,6 +3121,87 @@
           }
         }
       });
+    }
+
+    // 2c. THE UNDER-ISLE HUT — a cosy storybook cottage on a hanging stone
+    // terrace tucked against the belly's front-left face (clear of the
+    // waterfall channel x −2…3 at z>12). Warm lamplight under the island
+    // makes the underside feel lived-in and welcoming from every angle.
+    const hutTimberMat = new T.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.85, flatShading: true });
+    applyGhibliToon(hutTimberMat, { shadowTint: new T.Color(0x4a3728) });
+    const underHut = new T.Group();
+    underHut.position.set(-12, -5.4, 6.2);
+    underHut.rotation.y = 0.55;
+    // hanging stone terrace — tapers downward, embedding up into the belly
+    const terraceRock = new T.Mesh(new T.CylinderGeometry(3.2, 2.1, 3.0, 9), rockMat);
+    terraceRock.position.y = -1.3;
+    terraceRock.castShadow = true;
+    terraceRock.receiveShadow = true;
+    underHut.add(terraceRock);
+    // grass cap so the terrace reads as a little hanging meadow
+    const terraceGrass = new T.Mesh(new T.CylinderGeometry(3.35, 3.05, 0.5, 9), grassTopMat);
+    terraceGrass.position.y = 0.35;
+    terraceGrass.castShadow = true;
+    terraceGrass.receiveShadow = true;
+    underHut.add(terraceGrass);
+    // the hut itself — same storybook palette as the cottage above
+    attachModelSlot("cottage", underHut, 4.4, false, (m) => {
+      m.position.set(0.1, 0.58, 0.2);
+      m.rotation.set(0, 0.5, 0);
+      repaintStorybookCottage(m);
+    });
+    // two timber struts bracing the terrace up into the rock
+    [[-2.3, 1.6, 1.2, 0.5], [2.1, 1.6, 1.4, -0.5]].forEach(([sx, sy, sz, rz]) => {
+      const strut = new T.Mesh(new T.BoxGeometry(0.26, 3.4, 0.26), hutTimberMat);
+      strut.position.set(sx, sy, sz);
+      strut.rotation.z = rz;
+      strut.rotation.x = 0.3;
+      strut.castShadow = true;
+      underHut.add(strut);
+    });
+    // a warm lantern on the terrace rim
+    const hutLanternPost = new T.Mesh(new T.CylinderGeometry(0.06, 0.09, 1.5, 6), hutTimberMat);
+    hutLanternPost.position.set(2.35, 1.1, 1.3);
+    underHut.add(hutLanternPost);
+    const hutLanternFlame = new T.Mesh(
+      new T.SphereGeometry(0.22, 10, 8),
+      new T.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 2.6, roughness: 0.3 })
+    );
+    hutLanternFlame.position.set(2.35, 1.95, 1.3);
+    underHut.add(hutLanternFlame);
+    // a few glowing blossoms on the meadow
+    [[1.4, 0.85, 1.9, 0xe11d48], [-1.7, 0.85, 1.5, 0xf59e0b], [0.4, 0.85, -2.2, 0x38bdf8]].forEach(([fx, fy, fz, c]) => {
+      const flower = new T.Mesh(
+        new T.SphereGeometry(0.14, 8, 6),
+        new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7, roughness: 0.4 })
+      );
+      flower.position.set(fx, fy, fz);
+      underHut.add(flower);
+    });
+    // ivy trailing off the terrace rim
+    const hutVine = createHangingVine(3.2);
+    hutVine.position.set(-2.6, 0.2, 0.8);
+    underHut.add(hutVine);
+    // a second lantern on the far rim + a soft warm glow so the hut
+    // reads as a welcoming light under the isle, not a dark shape
+    const hutLanternPost2 = new T.Mesh(new T.CylinderGeometry(0.06, 0.09, 1.3, 6), hutTimberMat);
+    hutLanternPost2.position.set(-2.3, 1.0, -1.6);
+    underHut.add(hutLanternPost2);
+    const hutLanternFlame2 = hutLanternFlame.clone();
+    hutLanternFlame2.position.set(-2.3, 1.75, -1.6);
+    underHut.add(hutLanternFlame2);
+    const hutGlow = new T.PointLight(0xffc98a, 1.8, 20, 1.7);
+    hutGlow.position.set(0, 1.6, 0);
+    underHut.add(hutGlow);
+    station0Group.add(underHut);
+
+    // 2. The Storybook Cottage on the open left flank of the crest —
+    // bigger, recoloured (cream walls, terracotta roof, honey timber,
+    // warmly lit windows) and grounded on a stone pad with a path
+    attachModelSlot("cottage", station0Group, 8.2, false, (m) => {
+      m.position.set(-10.5, 10.62, 2.0);
+      m.rotation.set(0, 0.7, 0);
+      repaintStorybookCottage(m);
       clickTargets.push({ mesh: m, stationIdx: 0, name: "The Storybook Cottage", type: "house" });
     });
 
@@ -4838,8 +4916,28 @@
   let orbitPitch = 0;
   let targetOrbitYaw = 0;
   let targetOrbitPitch = 0;
-  let zoomFactor = 1.0;
-  let targetZoomFactor = 1.0;
+
+  // ── Zoom ──
+  // 1.0 = the designed waypoint framing. The friendly first-visit framing is
+  // 1.25 — the level indicator reads 80% — so newcomers get a comfortable,
+  // readable view instead of the accidental 40% that plain scrolling used
+  // to drift them to (the wheel no longer zooms while scrolling the story).
+  // The visitor's own choice is remembered in localStorage, so the realm
+  // always reopens exactly how they like to travel.
+  const ZOOM_DEFAULT = 1.25;
+  const ZOOM_MIN = 0.35;
+  const ZOOM_MAX = 3.0;
+  const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  let savedZoom = 0;
+  try { savedZoom = Number(localStorage.getItem("isles-zoom")) || 0; } catch {}
+  let zoomFactor = savedZoom ? clampZoom(savedZoom) : ZOOM_DEFAULT;
+  let targetZoomFactor = zoomFactor;
+  let lastSavedZoom = zoomFactor;
+  const rememberZoom = () => {
+    if (Math.abs(targetZoomFactor - lastSavedZoom) < 0.005) return;
+    lastSavedZoom = targetZoomFactor;
+    try { localStorage.setItem("isles-zoom", String(targetZoomFactor)); } catch {}
+  };
 
   // Raycaster for 3D Island Beacons and Click Targets
   const raycaster = new T.Raycaster();
@@ -4945,10 +5043,11 @@
     } else if (document.body.classList.contains("cinema-mode") || isDragging) {
       // In 3D Cinema Mode or dragging: wheel controls zoom without jumping stations
       e.preventDefault();
-      targetZoomFactor = Math.max(0.35, Math.min(3.0, targetZoomFactor + e.deltaY * 0.0015));
-    } else {
-      targetZoomFactor = Math.max(0.35, Math.min(3.0, targetZoomFactor + e.deltaY * 0.0008));
+      targetZoomFactor = clampZoom(targetZoomFactor + e.deltaY * 0.0015);
     }
+    // Plain scrolling drives the story only — it must never silently zoom
+    // the camera out (that side effect is what left first-time visitors
+    // stranded at a tiny 40% view by the last isle).
   }, { passive: false });
 
   // Keyboard zoom & reset shortcuts (+ / - / 0)
@@ -4966,17 +5065,17 @@
   // Global Zoom & Camera Navigation API
   window.__getCurrentProgress = () => currentStationProgress;
   window.__getZoomFactor = () => zoomFactor;
-  window.__setZoom = (z) => { targetZoomFactor = Math.max(0.35, Math.min(3.0, z)); };
+  window.__setZoom = (z) => { targetZoomFactor = clampZoom(z); };
   // QA/debug: drive the free-orbit state directly (radians, zoom multiplier)
   window.__setOrbit = (yaw, pitch, zoom) => {
     targetOrbitYaw = yaw;
     targetOrbitPitch = pitch;
-    if (zoom) targetZoomFactor = Math.max(0.35, Math.min(3.0, zoom));
+    if (zoom) targetZoomFactor = clampZoom(zoom);
   };
   window.__getOrbit = () => ({ yaw: orbitYaw, pitch: orbitPitch, zoom: zoomFactor });
-  window.__zoomIn = () => { targetZoomFactor = Math.max(0.35, targetZoomFactor * 0.80); };
-  window.__zoomOut = () => { targetZoomFactor = Math.min(3.0, targetZoomFactor * 1.25); };
-  window.__resetZoom = () => { targetZoomFactor = 1.0; targetOrbitYaw = 0; targetOrbitPitch = 0; };
+  window.__zoomIn = () => { targetZoomFactor = clampZoom(targetZoomFactor * 0.80); };
+  window.__zoomOut = () => { targetZoomFactor = clampZoom(targetZoomFactor * 1.25); };
+  window.__resetZoom = () => { targetZoomFactor = ZOOM_DEFAULT; targetOrbitYaw = 0; targetOrbitPitch = 0; };
   window.__flyToStation = (stationIdx) => {
     FORCED_STATION = null;
     targetStationProgress = Math.max(0, Math.min(4.0, stationIdx));
@@ -4989,7 +5088,7 @@
     if (e.target.closest("button, a, input, .panel, #cmdk")) return;
     targetOrbitYaw = 0;
     targetOrbitPitch = 0;
-    targetZoomFactor = 1.0;
+    targetZoomFactor = ZOOM_DEFAULT;
   });
 
   /* ── 8. ANIMATION LOOP ─────────────────────────────────────────────── */
@@ -5080,6 +5179,7 @@
     orbitYaw += (targetOrbitYaw - orbitYaw) * 0.08;
     orbitPitch += (targetOrbitPitch - orbitPitch) * 0.08;
     zoomFactor += (targetZoomFactor - zoomFactor) * 0.08;
+    rememberZoom();
 
     // Base offset from lookAt target to camera waypoint
     const baseOffset = new T.Vector3().subVectors(currentPos, currentLookAt);
