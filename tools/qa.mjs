@@ -17,7 +17,7 @@ import { writeFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = process.env.CHROME_BIN || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -41,6 +41,7 @@ const chrome = spawn(
   CHROME,
   [
     "--headless=new",
+    ...(process.env.CI ? ["--no-sandbox", "--disable-gpu"] : []),
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     `--window-size=${width},${height}`,

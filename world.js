@@ -2961,6 +2961,112 @@
 
     station0Group.add(upperCragGroup);
 
+    // 2b. HANGING GARDEN — the hero isle's great rock underside used to read
+    //     as one dark dead mass "hiding" everything below it. Dress it so the
+    //     island's bottom is a destination, not a wall: glowing crystal
+    //     clusters, trailing ivy vines, and three small floating shard-islets
+    //     drifting beneath the rim.
+    const hangGarden = new T.Group();
+    station0Group.add(hangGarden);
+
+    const vineLeafMat = new T.MeshStandardMaterial({ color: 0x6ee7a0, roughness: 0.7, emissive: 0x166534, emissiveIntensity: 0.9 });
+    applyGhibliToon(vineLeafMat, { shadowTint: new T.Color(0x14532d), rimColor: new T.Color(0xbbf7d0) });
+    const vineBloomMat = new T.MeshStandardMaterial({
+      color: 0xf9a8d4, emissive: 0xec4899, emissiveIntensity: 2.2, roughness: 0.5,
+    });
+
+    function createHangingVine(len) {
+      const v = new T.Group();
+      const segs = 4;
+      for (let s = 0; s < segs; s++) {
+        const leaf = new T.Mesh(new T.IcosahedronGeometry(0.52 - s * 0.07, 0), vineLeafMat);
+        leaf.position.set(Math.sin(s * 1.7) * 0.22, -(s + 0.5) * (len / segs), Math.cos(s * 1.3) * 0.22);
+        leaf.rotation.set(s * 0.9, s * 1.4, s * 0.6);
+        leaf.scale.set(1, 0.45, 1);
+        leaf.castShadow = true;
+        v.add(leaf);
+      }
+      const bloom = new T.Mesh(new T.OctahedronGeometry(0.2, 0), vineBloomMat);
+      bloom.position.set(Math.sin(segs * 1.7) * 0.22, -len, Math.cos(segs * 1.3) * 0.22);
+      v.add(bloom);
+      return v;
+    }
+
+    // Crystal clusters + vines hang from the PROCEDURAL crag tiers' lower
+    // rims (tier1 bottom y≈3.5 reaching z≈16.8, tier2 bottom y≈−2.5 reaching
+    // z≈10.8) — those are the faces the establishing camera actually sees —
+    // plus a few clusters on the deep GLB belly for orbit/midflight views.
+    // The waterfall lip sits at x≈0, z≈14, so nothing is placed in x −2…3
+    // at z > 12 (that is the fall's channel).
+    const underCrystalMat = new T.MeshStandardMaterial({
+      color: 0x7dd3fc, emissive: 0x22d3ee, emissiveIntensity: 3.6, roughness: 0.15,
+    });
+    [
+      // tier-1 rim (just under the upper rock shelf)
+      [-7, 3.0, 10.5, 1.1], [5.5, 3.0, 12.2, 0.95], [9.5, 2.9, 8.5, 1.2],
+      [12.5, 2.8, 2.5, 1.0], [-11.5, 2.9, 5, 1.15], [-13.5, 2.8, -2, 0.9],
+      // tier-2 rim (the shadowed shelf mid-way down)
+      [-4.5, -2.9, 6.5, 1.05], [5.5, -2.9, 5.5, 0.9], [9, -2.7, 0.5, 1.1],
+      [-8.5, -2.8, -2.5, 1.0], [1, -3.1, -7.5, 0.95],
+      // deep GLB belly — seen from orbit mode and the flight corridors
+      [-12, -12.2, -4, 1.15], [0.5, -13.6, -8, 0.95], [8, -12.6, 4.5, 1.1],
+    ].forEach(([x, y, z, s], i) => {
+      const clus = new T.Group();
+      clus.position.set(x, y - 0.4, z);
+      for (let k = 0; k < 3; k++) {
+        const spike = new T.Mesh(new T.OctahedronGeometry(1.1 * s * (1 - k * 0.25), 0), underCrystalMat);
+        spike.position.set((k - 1) * 0.9 * s, -k * 0.85 * s, (k % 2) * 0.5 * s);
+        spike.rotation.set(0.5 + k, k * 0.8, 0.3 * k);
+        spike.scale.set(0.6, 2.0, 0.6); // spike points downward
+        clus.add(spike);
+      }
+      hangGarden.add(clus);
+      if (i % 3 === 0) rotatingElements.push({ obj: clus, speedY: 0.02 + (i % 5) * 0.004 });
+
+      const vine = createHangingVine(2.6 + (i % 3) * 1.1);
+      vine.position.set(x * 0.94, y - 0.9, z * 0.94);
+      hangGarden.add(vine);
+    });
+
+    // Long ivy strands draping over the grass rim and down the near rock
+    // face — the classic floating-island silhouette, and the detail that
+    // makes the underside read as living instead of a blank wall.
+    [
+      [-9, 9.9, 9.5, 5.5], [-3.8, 10.1, 14.6, 4.6], [6.5, 10.0, 13.8, 5.0],
+      [10.5, 9.7, 9.0, 4.2], [13.5, 9.5, 3.0, 3.6], [-13.5, 9.9, 4.5, 4.4],
+      [-6, -2.2, 7.5, 3.4], [3.5, -2.3, 8.0, 3.0], [-9.5, -2.2, 0.5, 2.8],
+    ].forEach(([x, y, z, len], i) => {
+      const vine = createHangingVine(len);
+      vine.position.set(x, y, z);
+      hangGarden.add(vine);
+    });
+
+    // Three floating shard-islets beneath the isle — the "stack" now reads as
+    // a magical archipelago trailing into the clouds instead of a blank wall.
+    // Placed on sight-lines that clear the isle's near rim from the
+    // establishing camera (verified by raycast).
+    [
+      [-18, -19, -2, 2.6], [11.5, -20.0, -6.5, 2.2], [-2.0, -24.5, 13.0, 1.7],
+    ].forEach(([x, y, z, r], i) => {
+      const shard = new T.Group();
+      shard.position.set(x, y, z);
+      const shardRock = new T.Mesh(new T.DodecahedronGeometry(r, 0), rockMat);
+      shardRock.scale.set(1, 1.5, 1);
+      shardRock.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+      shardRock.castShadow = true;
+      shard.add(shardRock);
+      const shardGrass = new T.Mesh(new T.CylinderGeometry(r * 0.85, r * 0.55, 0.5, 8), grassTopMat);
+      shardGrass.position.y = r * 1.28;
+      shard.add(shardGrass);
+      const shardGem = new T.Mesh(new T.OctahedronGeometry(0.4, 0), underCrystalMat);
+      shardGem.position.set(r * 0.4, r * 0.4, -r * 0.3);
+      shard.add(shardGem);
+      hangGarden.add(shard);
+      rotatingElements.push({ obj: shardGem, speedY: 0.025 });
+      // gentle bob so the stack feels alive
+      rotatingElements.push({ obj: shard, speedY: 0, bobAmp: 0.5 + i * 0.2, bobSpeed: 0.00035 + i * 0.00008, seed: i * 2.1, baseY: y });
+    });
+
     // 2. The Storybook Cottage on the open left flank of the crest —
     // bigger, recoloured (cream walls, terracotta roof, honey timber,
     // warmly lit windows) and grounded on a stone pad with a path
@@ -3018,9 +3124,12 @@
     station0Group.add(cottageFlowersR);
     station0Group.add(makeLanternPost(-12.9, 0.6, 2.4));
 
-    // 3. Majestic Grand Oak Tree sheltering the cottage (height 12 units)
-    attachModelSlot("treeCommon1", station0Group, 12.5, true, (m) => {
-      m.position.set(-12.5, 11.0, -5.5);
+    // 3. Majestic Grand Oak Tree BEHIND the cottage — pulled back-left and
+    //    trimmed so its canopy backs the roofline instead of swallowing it
+    //    (the old 12.5u crown at (-12.5,-5.5) boxed over the cottage roof
+    //    and hid it from the establishing camera).
+    attachModelSlot("treeCommon1", station0Group, 11.5, true, (m) => {
+      m.position.set(-16.2, 10.7, -8.6);
       m.rotation.set(0, 1.1, 0);
     });
 
@@ -3030,8 +3139,11 @@
       m.rotation.set(0, 2.1, 0);
     });
 
+    // Pine moved OFF the cottage's front lawn (it used to stand right in
+    // front of the façade and block the lower-left wall) to the open
+    // front-right rim, where it frames the dock side instead.
     attachModelSlot("treePine", station0Group, 9.0, true, (m) => {
-      m.position.set(-13.5, 10.5, 5.0);
+      m.position.set(-3.2, 10.5, 12.2);
     });
 
     attachModelSlot("treeBirch", station0Group, 8.0, true, (m) => {
@@ -4288,7 +4400,11 @@
        and the realms read as one connected archipelago.
        ═══════════════════════════════════════════════════════════════════ */
     const WAYPOINT_ISLES = [
-      { pos: [72, -4, -48],   isle: [7.0, 12.0],  tree: "treePine",   h: 5.5, deco: "flowers" },
+      // Isle 0 sits low-right of the hero isle — pulled further out and down
+      // so the hero isle's rock underside no longer swallows it from the
+      // establishing camera, and given its own cottage (see below) so the
+      // "island below" reads as a charming neighbour isle, not a hidden blob.
+      { pos: [84, -14, -58],  isle: [7.0, 12.0],  tree: "treePine",   h: 5.5, deco: "flowers" },
       { pos: [-75, -2, -50],  isle: [6.0, 10.0],  tree: "treeBirch",  h: 5.0, deco: "rocks" },
       { pos: [40, 6, -150],   isle: [5.5, 9.0],   tree: "treeAutumn", h: 4.5, deco: "flowers" },
       { pos: [-100, 18, -168], isle: [7.0, 12.0], tree: "treePine",   h: 6.0, deco: "gems" },
@@ -4305,9 +4421,21 @@
       wg.add(wIsle);
 
       attachModelSlot(w.tree === "treeAutumn" ? "treeAutumn" : w.tree, wg, w.h, true, (t) => {
-        t.position.set(0.6, 0.95, 0.2);
+        // on the neighbour isle (wi 0) the pine moves to the far flank so the
+        // cottage below owns the camera-facing side
+        t.position.set(wi === 0 ? 2.6 : 0.6, 0.95, wi === 0 ? -0.8 : 0.2);
         if (w.tree === "treeAutumn") styleAutumnTree(t, wi % 2 === 0 ? 0xf43f5e : 0xf59e0b);
       });
+
+      // The neighbour isle below the hero isle gets its own little cottage,
+      // on the camera-facing flank with warm windows — so visitors actually
+      // SEE the house on the lower isle instead of a rock wall.
+      if (wi === 0) {
+        attachModelSlot("cottage", wg, 5.4, false, (m) => {
+          m.position.set(-2.4, 0.82, 2.0);
+          m.rotation.set(0, -0.75, 0);
+        });
+      }
 
       if (w.deco === "flowers") {
         const fp = createFlowerPatch(2.4, 10);
@@ -4971,6 +5099,10 @@
 
     // Animate rotating elements (windmill, armillary, vortex)
     rotatingElements.forEach((item) => {
+      if (item.bobAmp) {
+        // gentle vertical bob for floating shards / drifting props
+        item.obj.position.y = item.baseY + Math.sin(elapsedTime * (item.bobSpeed || 0.0004) + (item.seed || 0)) * item.bobAmp;
+      }
       if (item.rotateAxisY) {
         item.obj.rotateY(item.speed);
       } else if (item.rotateAxisZ) {

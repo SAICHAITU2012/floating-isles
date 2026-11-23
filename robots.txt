@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://saichaiu2012.github.io/floating-isles/sitemap.xml
+Sitemap: https://saichaitu2012.github.io/floating-isles/sitemap.xml

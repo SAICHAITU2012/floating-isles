@@ -1,6 +1,6 @@
 # The Floating Realm — an explorable 3D portfolio
 
-**Live: https://saichaiu2012.github.io/floating-isles/**
+**Live: https://saichaitu2012.github.io/floating-isles/**
 
 Scroll and the camera flies you across five floating islands: a hero isle at
 morning, a celestial carnival at noon, a golden-hour archipelago of shipped

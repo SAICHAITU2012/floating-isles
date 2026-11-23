@@ -38,9 +38,45 @@ jobs:
           node --check world.js
           node --check tools/server.mjs
 
+  qa:
+    name: Headless render QA (stations must load with zero console errors)
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Serve the site locally
+        run: |
+          node tools/server.mjs &
+          sleep 2
+      - name: Render every station in headless Chrome and gate on errors
+        env:
+          CI: "1"
+          CHROME_BIN: /usr/bin/google-chrome
+        run: |
+          set -e
+          command -v google-chrome >/dev/null || { echo "google-chrome not found on runner"; exit 1; }
+          for st in 0 1 2 3 4; do
+            echo "== station $st =="
+            node tools/qa.mjs \
+              --url "http://127.0.0.1:8099/?at=$st" \
+              --out "qa/ci_st$st.png" \
+              --width 1280 --height 800 --wait 8000 \
+              --settle "Boolean(window.__WORLD_LOADED)" \
+              --probe "JSON.stringify({loaded:!!window.__WORLD_LOADED})" \
+              | tee "qa/ci_st$st.json"
+            node -e "
+              const r = JSON.parse(require('fs').readFileSync('qa/ci_st$st.json','utf8'));
+              if (!r.probe || !JSON.parse(r.probe).loaded) { console.error('world did not load at station $st'); process.exit(1); }
+              if ((r.errors||[]).length) { console.error('console errors at station $st:', r.errors); process.exit(1); }
+            "
+          done
+
   deploy:
     name: Publish to GitHub Pages
-    needs: verify
+    needs: qa
     runs-on: ubuntu-latest
     environment:
       name: github-pages
