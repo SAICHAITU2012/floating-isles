@@ -1458,8 +1458,10 @@
     applyGhibliToon(skirtMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0xfff1dc) });
     const skirt = new T.Mesh(skirtGeo, skirtMat);
     if (isSeated) {
-      skirt.rotation.x = Math.PI / 2.5;
-      skirt.position.set(0, 0.45, 0.42);
+      // A seated skirt must stay upright — tipping the cone 72 degrees threw
+      // the whole frock sideways. Flatten and widen it instead.
+      skirt.position.set(0, 0.52, 0.08);
+      skirt.scale.set(1.12, 0.72, 1.18);
     } else {
       skirt.position.y = 0.95;
     }
@@ -1472,7 +1474,8 @@
     const hem = new T.Mesh(hemGeo, hemMat);
     if (isSeated) {
       hem.rotation.x = Math.PI / 2.5;
-      hem.position.set(0, 0.45, 1.08);
+      hem.position.set(0, 0.18, 0.08);
+      hem.scale.set(1.1, 1, 1.16);
     } else {
       hem.rotation.x = Math.PI / 2;
       hem.position.y = 0.25;
@@ -4154,22 +4157,36 @@
       // Connecting suspension bridge between adjacent islands
       if (idx < PROJECT_POSITIONS.length - 1) {
         const next = PROJECT_POSITIONS[idx + 1];
-        const bridgeGeo = new T.BoxGeometry(1.4, 0.25, 1.4);
-        const bridgeMat = new T.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.9 });
-        applyGhibliToon(bridgeMat);
+        const bridgeGeo = new T.BoxGeometry(1.6, 0.24, 1.6);
 
-        // Chain of planks
-        const planks = 7;
+        // Chain of planks, colour-graded from one isle's tint to the next
+        const planks = 9;
+        const cA = new T.Color(proj.color), cB = new T.Color(next.color);
         for (let p = 1; p < planks; p++) {
           const t = p / planks;
           const px = T.MathUtils.lerp(proj.x, next.x, t);
           const py = T.MathUtils.lerp(proj.y, next.y, t) - Math.sin(t * Math.PI) * 1.5 + 1.2;
           const pz = T.MathUtils.lerp(proj.z, next.z, t);
 
-          const plank = new T.Mesh(bridgeGeo, bridgeMat);
+          const plankMat = new T.MeshStandardMaterial({
+            color: cA.clone().lerp(cB, t), roughness: 0.5, metalness: 0.2,
+          });
+          applyGhibliToon(plankMat);
+          const plank = new T.Mesh(bridgeGeo, plankMat);
           plank.position.set(px, py, pz);
           plank.lookAt(next.x, next.y, next.z);
           station2Group.add(plank);
+
+          // a glowing bead on each side of every other plank
+          if (p % 2 === 0) {
+            const bead = new T.Mesh(new T.SphereGeometry(0.1, 7, 6),
+              new T.MeshStandardMaterial({ color: 0xffffff, emissive: cB, emissiveIntensity: 1.7, roughness: 0.25 }));
+            bead.position.set(px, py + 0.55, pz + 0.7);
+            station2Group.add(bead);
+            const bead2 = bead.clone();
+            bead2.position.z = pz - 0.7;
+            station2Group.add(bead2);
+          }
         }
       }
 
@@ -4479,6 +4496,144 @@
       station0Group.add(ball);
     }
 
+    /* ── THE PARK ON THE OTHER SIDE OF THE HOUSE ─────────────────────────
+       Behind the cottage: a little gazebo with hanging lanterns, benches,
+       a duck pond, flower borders, and a gang of animals playing together
+       — three kittens, a puppy and a bunny, all bouncing about. */
+    {
+      const PX = -14.2, PZ = -2.4, PY = 10.70;  // the far side of the house (raycast-clear)
+      const parkWood = new T.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.85, flatShading: true });
+      applyGhibliToon(parkWood, { shadowTint: new T.Color(0x57330f), rimColor: new T.Color(0xffedd5) });
+      const parkStone = new T.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85, flatShading: true });
+      applyGhibliToon(parkStone, { shadowTint: new T.Color(0x64748b), rimColor: new T.Color(0xffffff) });
+
+      // gazebo: stone base, six posts, hex roof, finial
+      const base = new T.Mesh(new T.CylinderGeometry(3.3, 3.5, 0.3, 6), parkStone);
+      base.position.set(PX, PY + 0.15, PZ);
+      base.receiveShadow = true;
+      station0Group.add(base);
+      for (let p = 0; p < 6; p++) {
+        const a = (p / 6) * Math.PI * 2 + Math.PI / 6;
+        const post = new T.Mesh(new T.CylinderGeometry(0.12, 0.14, 3.1, 6), parkWood);
+        post.position.set(PX + Math.cos(a) * 3.0, PY + 1.75, PZ + Math.sin(a) * 3.0);
+        station0Group.add(post);
+      }
+      const gazRoof = new T.Mesh(new T.ConeGeometry(3.9, 1.9, 6),
+        new T.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.6, flatShading: true }));
+      gazRoof.position.set(PX, PY + 4.2, PZ);
+      station0Group.add(gazRoof);
+      const finial = new T.Mesh(new T.SphereGeometry(0.3, 10, 8),
+        new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.8, roughness: 0.25, emissive: 0xfde68a, emissiveIntensity: 0.35 }));
+      finial.position.set(PX, PY + 5.25, PZ);
+      station0Group.add(finial);
+      // hanging lanterns from the eaves
+      const gelMat = new T.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xffb020, emissiveIntensity: 1.7, roughness: 0.25 });
+      for (let p = 0; p < 6; p++) {
+        const a = (p / 6) * Math.PI * 2;
+        const gl = new T.Mesh(new T.SphereGeometry(0.16, 8, 6), gelMat);
+        gl.position.set(PX + Math.cos(a) * 2.6, PY + 3.35, PZ + Math.sin(a) * 2.6);
+        station0Group.add(gl);
+      }
+      const gazLight = new T.PointLight(0xffc477, 1.4, 14, 1.9);
+      gazLight.position.set(PX, PY + 3.2, PZ);
+      station0Group.add(gazLight);
+      // bench under the gazebo
+      const seat = new T.Mesh(new T.BoxGeometry(2.4, 0.16, 0.7), parkWood);
+      seat.position.set(PX, PY + 0.95, PZ + 1.4);
+      station0Group.add(seat);
+      const back = new T.Mesh(new T.BoxGeometry(2.4, 0.5, 0.12), parkWood);
+      back.position.set(PX, PY + 1.3, PZ + 1.72);
+      station0Group.add(back);
+
+      // duck pond with lily pads
+      const pond = new T.Mesh(new T.CircleGeometry(2.6, 24),
+        new T.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, roughness: 0.15, metalness: 0.35 }));
+      pond.rotation.x = -Math.PI / 2;
+      pond.position.set(PX + 3.5, PY + 0.06, PZ + 1.6);
+      station0Group.add(pond);
+      const pondRim = new T.Mesh(new T.TorusGeometry(2.62, 0.2, 6, 26), parkStone);
+      pondRim.rotation.x = Math.PI / 2;
+      pondRim.position.set(PX + 3.5, PY + 0.1, PZ + 1.6);
+      station0Group.add(pondRim);
+      [[PX + 2.9, PZ + 0.9], [PX + 4.1, PZ + 2.4]].forEach(([lx, lz]) => {
+        const pad = new T.Mesh(new T.CylinderGeometry(0.45, 0.45, 0.05, 8),
+          new T.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.7 }));
+        pad.position.set(lx, PY + 0.12, lz);
+        station0Group.add(pad);
+      });
+      // ducks
+      [[PX + 2.8, PZ + 1.8], [PX + 4.0, PZ + 1.0]].forEach(([dx, dz], i) => {
+        const duck = new T.Group();
+        const body = new T.Mesh(new T.SphereGeometry(0.24, 10, 8),
+          new T.MeshStandardMaterial({ color: 0xfef9c3, roughness: 0.6 }));
+        body.scale.set(1.3, 0.9, 1);
+        duck.add(body);
+        const head = new T.Mesh(new T.SphereGeometry(0.13, 8, 8),
+          new T.MeshStandardMaterial({ color: 0x166534, roughness: 0.6 }));
+        head.position.set(0.24, 0.2, 0);
+        duck.add(head);
+        const beak = new T.Mesh(new T.ConeGeometry(0.05, 0.12, 5),
+          new T.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5 }));
+        beak.rotation.z = -Math.PI / 2;
+        beak.position.set(0.37, 0.19, 0);
+        duck.add(beak);
+        duck.position.set(dx, PY + 0.2, dz);
+        duck.rotation.y = i * 1.7;
+        station0Group.add(duck);
+      });
+
+      // flower borders
+      [[PX - 2.6, PZ + 3.2], [PX + 2.8, PZ - 2.4], [PX + 6.4, PZ - 1.0]].forEach(([fx, fz]) => {
+        const patch = createFlowerPatch(1.7, 12);
+        patch.position.set(fx, PY + 0.02, fz);
+        station0Group.add(patch);
+      });
+
+      /* ── the animals, and they are PLAYING ───────────────────────────
+         Kittens chase each other in a circle, a puppy bounds about and a
+         bunny hops. All of them are bump-animated in the render loop. */
+      const playground = { kittens: [], pets: [] };
+      const kittenColors = [0xf97316, 0xf1f5f9, 0x475569];
+      kittenColors.forEach((c, i) => {
+        const k = createCat(c);
+        const a = (i / 3) * Math.PI * 2;
+        k.group.position.set(6.2 + Math.cos(a) * 1.5, 11.42, 9.8 + Math.sin(a) * 1.1);
+        k.group.scale.setScalar(1.9);
+        station0Group.add(k.group);
+        catAnimData.push(k);
+        playground.kittens.push({ group: k.group, cx: 6.2, cz: 9.8, r: 1.5, a, speed: 0.7 + i * 0.12, phase: i * 2.1 });
+      });
+      // puppy
+      const puppy = createCat(0xd97706);
+      puppy.group.scale.setScalar(2.3);
+      puppy.group.position.set(2.4, 11.42, 9.9);
+      station0Group.add(puppy.group);
+      catAnimData.push(puppy);
+      playground.pets.push({ group: puppy.group, base: new T.Vector3(2.4, 11.42, 9.9), phase: 0 });
+      // bunny
+      const bunnyG = new T.Group();
+      const bBody = new T.Mesh(new T.SphereGeometry(0.3, 10, 8),
+        new T.MeshStandardMaterial({ color: 0xf5f5f4, roughness: 0.75, flatShading: true }));
+      bBody.scale.set(1, 0.9, 1.25);
+      bunnyG.add(bBody);
+      const bHead = new T.Mesh(new T.SphereGeometry(0.2, 10, 8),
+        new T.MeshStandardMaterial({ color: 0xf5f5f4, roughness: 0.75, flatShading: true }));
+      bHead.position.set(0, 0.28, 0.26);
+      bunnyG.add(bHead);
+      [-1, 1].forEach((s) => {
+        const ear = new T.Mesh(new T.CylinderGeometry(0.05, 0.045, 0.36, 6),
+          new T.MeshStandardMaterial({ color: 0xfda4af, roughness: 0.7 }));
+        ear.position.set(s * 0.1, 0.52, 0.24);
+        ear.rotation.z = s * 0.16;
+        bunnyG.add(ear);
+      });
+      bunnyG.scale.setScalar(1.8);
+      bunnyG.position.set(8.0, 11.42, 10.6);
+      station0Group.add(bunnyG);
+      playground.pets.push({ group: bunnyG, base: new T.Vector3(8.0, 11.42, 10.6), phase: 1.6 });
+      window.__parkPlay = playground;
+    }
+
     attachModelSlot("windmill", millIsleG, 13.0, false, (mill) => {
       mill.position.set(-1.5, 2.32, -2.5);
       mill.rotation.set(0, -0.42, 0);
@@ -4493,7 +4648,7 @@
 
     // Wooden dock reaching toward the viewer, far end overhanging the rim
     attachModelSlot("dock", millIsleG, 4.2, false, (dock) => {
-      dock.position.set(3.2, 2.26, 12.4);
+      dock.position.set(1.4, 2.26, 13.4);
       dock.rotation.set(0, 0.35, 0);
     });
 
@@ -4544,105 +4699,123 @@
       groundAnimals.push(mb);
     });
 
-    // Suspension bridge: miller's isle ↔ heart of the project crescent
+    /* ── THE RAINBOW ARCH BRIDGE ─────────────────────────────────────────
+       Rebuilt between two real islands: the miller's isle (where the
+       windmill and fountain live) and the Pi Pico Cluster isle, instead of
+       the old diagonal that floated off into empty sky. Arched, stepped,
+       colour-graded deck, gold rails, lantern orbs, bunting, ivy, gateway
+       posts with glowing crystals at both ends, and drifting fireflies. */
     {
-      const bridgeMat = new T.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.9 });
-      applyGhibliToon(bridgeMat);
-      const from = { x: 2, y: 2.4, z: 18 }, to = { x: -4, y: 6.4, z: -10 };
-      const plankAt = (t) => ({
-        x: T.MathUtils.lerp(from.x, to.x, t),
-        y: T.MathUtils.lerp(from.y, to.y, t) - Math.sin(t * Math.PI) * 1.5,
-        z: T.MathUtils.lerp(from.z, to.z, t),
-      });
-      for (let p = 1; p < 10; p++) {
-        const t = p / 10;
-        const plank = new T.Mesh(new T.BoxGeometry(1.4, 0.25, 1.4), bridgeMat);
-        const pp = plankAt(t);
-        plank.position.set(pp.x, pp.y, pp.z);
-        plank.lookAt(to.x, to.y, to.z);
+      const from = new T.Vector3(11.4, 2.75, 11.2);   // miller's isle, toward Anime
+      const to = new T.Vector3(17.4, 4.55, 7.6);      // Anime Scenery isle rim
+      const span = new T.Vector3().subVectors(to, from);
+      const spanLen = span.length();
+      const dir = span.clone().normalize();
+      const side = new T.Vector3(-dir.z, 0, dir.x).normalize();
+      const arc = (t) => Math.sin(t * Math.PI) * 1.9;
+      const at = (t) => new T.Vector3(
+        from.x + span.x * t,
+        from.y + span.y * t + arc(t),
+        from.z + span.z * t
+      );
+
+      const deckColors = [0xf59e0b, 0xfb7185, 0xf472b6, 0xa855f7, 0x818cf8, 0x38bdf8, 0x22d3ee, 0x34d399];
+      const goldMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.24 });
+      const stoneMat = new T.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.85, flatShading: true });
+      applyGhibliToon(stoneMat, { shadowTint: new T.Color(0x78716c), rimColor: new T.Color(0xffffff) });
+
+      const planks = 14;
+      for (let i = 0; i <= planks; i++) {
+        const t = i / planks;
+        const p = at(t);
+        const plank = new T.Mesh(
+          new T.BoxGeometry(1.75, 0.22, spanLen / planks + 0.14),
+          new T.MeshStandardMaterial({ color: deckColors[Math.min(deckColors.length - 1, Math.floor(t * deckColors.length))], roughness: 0.55, metalness: 0.12 })
+        );
+        plank.position.copy(p);
+        plank.lookAt(at(Math.min(1, t + 0.02)));
+        plank.castShadow = true;
         station2Group.add(plank);
       }
-
-      /* ── Turn the bare bridge into a little festival crossing ──────
-         Gold catenary hand-rails, glowing lantern orbs at every third
-         plank, dancing strings of bunting, ivy and flowers along the
-         rope line, and drifting sparkle motes under the deck. */
-      const railMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.25 });
-      const vineMat = new T.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8, flatShading: true });
-      const bloomMat = new T.MeshStandardMaterial({ color: 0xf9a8d4, emissive: 0xec4899, emissiveIntensity: 0.45, roughness: 0.5 });
-      const lanternGlassMat = new T.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xffb020, emissiveIntensity: 1.9, roughness: 0.25 });
-      const lanternMetalMat = new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6, metalness: 0.4 });
-      const side = new T.Vector3(to.z - from.z, 0, -(to.x - from.x)).normalize().multiplyScalar(0.85);
-
-      for (let p = 0; p <= 20; p++) {
-        const t = p / 20;
-        const pp = plankAt(t);
-        [-1, 1].forEach((s) => {
-          // hand-rail: small gold posts
-          if (p % 2 === 0) {
-            const post = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 1.15, 5), railMat);
-            post.position.set(pp.x + side.x * s, pp.y + 0.62, pp.z + side.z * s);
-            station2Group.add(post);
-          }
-          // ivy + blossoms clinging to the rope line
-          if (p % 3 === 0) {
-            const leaf = new T.Mesh(new T.IcosahedronGeometry(0.2, 0), vineMat);
-            leaf.position.set(pp.x + side.x * s * 1.05, pp.y + 0.35 + Math.random() * 0.5, pp.z + side.z * s * 1.05);
-            leaf.scale.set(1, 0.7, 1);
-            station2Group.add(leaf);
-            if (p % 6 === 3) {
-              const bloom = new T.Mesh(new T.IcosahedronGeometry(0.12, 0), bloomMat);
-              bloom.position.set(leaf.position.x, leaf.position.y + 0.16, leaf.position.z);
-              station2Group.add(bloom);
-            }
-          }
-        });
-        // glowing lantern every third plank
-        if (p % 3 === 0 && p > 0 && p < 20) {
-          const arm = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 1.5, 5), railMat);
-          arm.rotation.z = Math.PI / 2;
-          arm.position.set(pp.x, pp.y + 1.25, pp.z);
-          arm.lookAt(to.x, pp.y + 1.25, to.z);
-          station2Group.add(arm);
-          const glass = new T.Mesh(new T.SphereGeometry(0.17, 8, 6), lanternGlassMat);
-          glass.position.set(pp.x + side.x * 0.85, pp.y + 1.12, pp.z + side.z * 0.85);
-          station2Group.add(glass);
-          const cap = new T.Mesh(new T.ConeGeometry(0.16, 0.14, 6), lanternMetalMat);
-          cap.position.set(glass.position.x, glass.position.y + 0.2, glass.position.z);
-          station2Group.add(cap);
-        }
-      }
-      // gold catenary rails on both sides
+      // gold hand-rails following the arch, with posts
       [-1, 1].forEach((s) => {
         const pts = [];
-        for (let p = 0; p <= 18; p++) {
-          const t = p / 18;
-          const pp = plankAt(t);
-          pts.push(new T.Vector3(pp.x + side.x * s, pp.y + 1.18, pp.z + side.z * s));
+        for (let i = 0; i <= planks; i++) {
+          const p = at(i / planks);
+          pts.push(new T.Vector3(p.x + side.x * s * 1.0, p.y + 1.05, p.z + side.z * s * 1.0));
         }
-        const curve = new T.CatmullRomCurve3(pts);
-        const rail = new T.Mesh(new T.TubeGeometry(curve, 40, 0.045, 5, false), railMat);
-        station2Group.add(rail);
+        station2Group.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 44, 0.055, 6, false), goldMat));
+        // rail posts + lantern orbs
+        for (let i = 0; i <= planks; i += 2) {
+          const p = at(i / planks);
+          const post = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 1.05, 5), goldMat);
+          post.position.set(p.x + side.x * s * 1.0, p.y + 0.55, p.z + side.z * s * 1.0);
+          station2Group.add(post);
+          if (i % 6 === 0 && i > 0 && i < planks) {
+            const orb = new T.Mesh(new T.SphereGeometry(0.15, 8, 7),
+              new T.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xffb020, emissiveIntensity: 2.0, roughness: 0.2 }));
+            orb.position.set(p.x + side.x * s * 1.0, p.y + 1.2, p.z + side.z * s * 1.0);
+            station2Group.add(orb);
+          }
+        }
       });
-      // bunting strung down the middle of the crossing
+      // ivy and blossoms clinging to the rails
+      const ivyMat = new T.MeshStandardMaterial({ color: 0x15803d, roughness: 0.85, flatShading: true });
+      const blooms = [0xf9a8d4, 0xfde68a, 0xbfdbfe];
+      for (let i = 1; i < planks; i += 2) {
+        const p = at(i / planks);
+        [-1, 1].forEach((s) => {
+          if (Math.random() < 0.25) return;
+          const leaf = new T.Mesh(new T.IcosahedronGeometry(0.2, 0), ivyMat);
+          leaf.position.set(p.x + side.x * s * 1.02, p.y + 0.6 + Math.random() * 0.3, p.z + side.z * s * 1.02);
+          leaf.scale.set(1, 0.65, 1);
+          station2Group.add(leaf);
+          if (i % 4 === 1) {
+            const b = new T.Mesh(new T.IcosahedronGeometry(0.11, 0),
+              new T.MeshStandardMaterial({ color: blooms[i % 3], emissive: blooms[i % 3], emissiveIntensity: 0.35, roughness: 0.5 }));
+            b.position.set(leaf.position.x, leaf.position.y + 0.15, leaf.position.z);
+            station2Group.add(b);
+          }
+        });
+      }
+      // bunting overhead
+      const midY = Math.max(from.y, to.y) + 4.4;
       createFestiveBunting(
-        new T.Vector3(from.x, from.y + 2.0, from.z),
-        new T.Vector3(to.x, to.y + 2.0, to.z), 9
+        new T.Vector3(from.x, midY - 0.6, from.z),
+        new T.Vector3(to.x, midY - 0.6, to.z), 9
       );
-      // drifting sparkle motes beneath the deck
+      // gateway posts with glowing crystals at both ends
+      [from, to].forEach((g, gi) => {
+        [-1, 1].forEach((s) => {
+          const post = new T.Mesh(new T.BoxGeometry(0.55, 3.0, 0.55), stoneMat);
+          post.position.set(g.x + side.x * s * 1.15, g.y + 1.5, g.z + side.z * s * 1.15);
+          station2Group.add(post);
+          const cap = new T.Mesh(new T.ConeGeometry(0.5, 0.6, 4), stoneMat);
+          cap.position.set(post.position.x, g.y + 3.25, post.position.z);
+          cap.rotation.y = Math.PI / 4;
+          station2Group.add(cap);
+          const cry = new T.Mesh(new T.OctahedronGeometry(0.2, 0),
+            new T.MeshStandardMaterial({ color: 0xa5f3fc, emissive: gi ? 0x22d3ee : 0xfbbf24, emissiveIntensity: 1.8, roughness: 0.15 }));
+          cry.position.set(post.position.x, g.y + 3.75, post.position.z);
+          cry.scale.set(1, 1.6, 1);
+          station2Group.add(cry);
+        });
+      });
+      window.__archBridge = { from: from.clone(), to: to.clone(), at };
+
+      // fireflies drifting under the arch
       const moteGeo = new T.BufferGeometry();
-      const moteN = 70;
+      const moteN = 90;
       const motePos = new Float32Array(moteN * 3);
       for (let m = 0; m < moteN; m++) {
-        const t = Math.random();
-        const pp = plankAt(t);
-        motePos[m * 3] = pp.x + (Math.random() - 0.5) * 3.2;
-        motePos[m * 3 + 1] = pp.y - 0.2 - Math.random() * 2.4;
-        motePos[m * 3 + 2] = pp.z + (Math.random() - 0.5) * 3.2;
+        const p = at(Math.random());
+        motePos[m * 3] = p.x + (Math.random() - 0.5) * 3.0;
+        motePos[m * 3 + 1] = p.y - 0.3 - Math.random() * 2.2;
+        motePos[m * 3 + 2] = p.z + (Math.random() - 0.5) * 3.0;
       }
       moteGeo.setAttribute("position", new T.BufferAttribute(motePos, 3));
       const motes = new T.Points(moteGeo, new T.PointsMaterial({
-        color: 0xa5f3fc, size: 0.16, transparent: true, opacity: 0.85,
+        color: 0xa5f3fc, size: 0.17, transparent: true, opacity: 0.9,
         depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true,
       }));
       station2Group.add(motes);
@@ -4770,6 +4943,143 @@
     const station4Group = new T.Group();
     station4Group.position.set(5, 24, -360);
     worldGroup.add(station4Group);
+
+    /* ── THE COSMIC BACKDROP ─────────────────────────────────────────────
+       The portal used to open onto black nothing. Now the gate sits inside
+       a living sky: a spiral galaxy, four nebula clouds, a dense starfield,
+       a ringed planet with a moon, and drawn constellation lines. */
+    {
+      const sky = new T.Group();
+      station4Group.add(sky);
+
+      // soft radial glow sprite texture
+      const glowTex = (() => {
+        const c = document.createElement("canvas");
+        c.width = c.height = 128;
+        const g = c.getContext("2d");
+        const rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+        rg.addColorStop(0, "rgba(255,255,255,1)");
+        rg.addColorStop(0.35, "rgba(255,255,255,0.55)");
+        rg.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = rg;
+        g.fillRect(0, 0, 128, 128);
+        return new T.CanvasTexture(c);
+      })();
+
+      const nebulaSpecs = [
+        { c: 0x8b5cf6, x: -78, y: 34, z: -110, s: 200, o: 0.55 },
+        { c: 0x22d3ee, x: 84, y: 26, z: -118, s: 220, o: 0.5 },
+        { c: 0xf472b6, x: -6, y: 78, z: -132, s: 240, o: 0.42 },
+        { c: 0x60a5fa, x: 34, y: -22, z: -96, s: 180, o: 0.45 },
+      ];
+      const nebulas = [];
+      nebulaSpecs.forEach((n) => {
+        const sp = new T.Sprite(new T.SpriteMaterial({
+          map: glowTex, color: n.c, transparent: true, opacity: n.o,
+          depthWrite: false, blending: T.AdditiveBlending,
+        }));
+        sp.position.set(n.x, n.y, n.z);
+        sp.scale.setScalar(n.s);
+        sky.add(sp);
+        nebulas.push(sp);
+      });
+
+      // dense starfield
+      const starCount = 1800;
+      const starGeo = new T.BufferGeometry();
+      const starPos = new Float32Array(starCount * 3);
+      const starCol = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        const r = 120 + Math.random() * 90;
+        const th = Math.random() * Math.PI * 2;
+        const ph = Math.acos(2 * Math.random() - 1);
+        starPos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+        starPos[i * 3 + 1] = r * Math.cos(ph) * 0.7 + 28;
+        starPos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+        const tint = Math.random();
+        starCol[i * 3] = tint > 0.75 ? 1 : 0.8;
+        starCol[i * 3 + 1] = tint > 0.5 ? 1 : 0.88;
+        starCol[i * 3 + 2] = 1;
+      }
+      starGeo.setAttribute("position", new T.BufferAttribute(starPos, 3));
+      starGeo.setAttribute("color", new T.BufferAttribute(starCol, 3));
+      const stars = new T.Points(starGeo, new T.PointsMaterial({
+        size: 1.1, vertexColors: true, transparent: true, opacity: 0.95,
+        depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true,
+      }));
+      sky.add(stars);
+
+      // spiral galaxy — two arms, warm core, cool rim
+      const galN = 1100;
+      const galGeo = new T.BufferGeometry();
+      const galPos = new Float32Array(galN * 3);
+      const galCol = new Float32Array(galN * 3);
+      const cWarm = new T.Color(0xfde68a), cMid = new T.Color(0xf472b6), cCool = new T.Color(0x60a5fa);
+      for (let i = 0; i < galN; i++) {
+        const arm = i % 2;
+        const t = Math.pow(Math.random(), 0.65);
+        const r = 6 + t * 62;
+        const ang = t * 3.4 + arm * Math.PI + (Math.random() - 0.5) * 0.6;
+        galPos[i * 3] = Math.cos(ang) * r;
+        galPos[i * 3 + 1] = (Math.random() - 0.5) * (3 + (1 - t) * 9);
+        galPos[i * 3 + 2] = Math.sin(ang) * r * 0.42;
+        const mix = cWarm.clone().lerp(cMid, Math.min(1, t * 2)).lerp(cCool, Math.max(0, t - 0.45));
+        galCol[i * 3] = mix.r; galCol[i * 3 + 1] = mix.g; galCol[i * 3 + 2] = mix.b;
+      }
+      galGeo.setAttribute("position", new T.BufferAttribute(galPos, 3));
+      galGeo.setAttribute("color", new T.BufferAttribute(galCol, 3));
+      const galaxy = new T.Points(galGeo, new T.PointsMaterial({
+        size: 1.4, vertexColors: true, transparent: true, opacity: 0.95,
+        depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true,
+      }));
+      galaxy.position.set(-64, 52, -104);
+      galaxy.rotation.set(0.55, 0.2, 0.35);
+      sky.add(galaxy);
+      // galaxy core glow
+      const core = new T.Sprite(new T.SpriteMaterial({
+        map: glowTex, color: 0xfff1c1, transparent: true, opacity: 0.85,
+        depthWrite: false, blending: T.AdditiveBlending,
+      }));
+      core.position.copy(galaxy.position);
+      core.scale.setScalar(34);
+      sky.add(core);
+
+      // ringed planet + moon
+      const planet = new T.Mesh(new T.SphereGeometry(13, 24, 18),
+        new T.MeshStandardMaterial({ color: 0x2e1065, emissive: 0x7c3aed, emissiveIntensity: 0.55, roughness: 0.6 }));
+      planet.position.set(74, 44, -112);
+      sky.add(planet);
+      const ring = new T.Mesh(new T.TorusGeometry(21, 2.6, 8, 44),
+        new T.MeshBasicMaterial({ color: 0xc4b5fd, transparent: true, opacity: 0.55, side: T.DoubleSide }));
+      ring.position.copy(planet.position);
+      ring.scale.setScalar(0.85);
+      ring.rotation.set(Math.PI * 0.62, 0.4, 0.2);
+      sky.add(ring);
+      const moon = new T.Mesh(new T.SphereGeometry(2.6, 14, 10),
+        new T.MeshStandardMaterial({ color: 0xa5f3fc, emissive: 0x22d3ee, emissiveIntensity: 0.7, roughness: 0.5 }));
+      moon.position.set(planet.position.x - 19, planet.position.y + 8, planet.position.z + 5);
+      sky.add(moon);
+
+      // constellation lines — bright nodes joined by glowing threads
+      const constStars = [
+        [-46, 16, -92], [-28, 30, -90], [-6, 22, -94], [16, 38, -90],
+        [38, 24, -96], [52, 42, -92], [28, 56, -88], [-4, 60, -86], [-30, 50, -88],
+      ];
+      const nodeMat = new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xbfdbfe, emissiveIntensity: 2.4, roughness: 0.2 });
+      const nodePts = constStars.map(([x, y, z]) => {
+        const s = new T.Mesh(new T.SphereGeometry(0.95, 8, 8), nodeMat);
+        s.position.set(x, y, z);
+        sky.add(s);
+        return new T.Vector3(x, y, z);
+      });
+      const lineMat = new T.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.42 });
+      for (let i = 0; i < nodePts.length - 1; i++) {
+        sky.add(new T.Line(new T.BufferGeometry().setFromPoints([nodePts[i], nodePts[i + 1]]), lineMat));
+      }
+      sky.add(new T.Line(new T.BufferGeometry().setFromPoints([nodePts[8], nodePts[0]]), lineMat));
+
+      window.__st4Sky = { sky, galaxy, stars, nebulas, moon, ring, planet, core };
+    }
 
     // Ancient Ruin Stone Pillars Archway
     const pillarGeo = new T.BoxGeometry(4.0, 26.0, 4.0);
@@ -5248,6 +5558,19 @@
     clickTargets.push({ mesh: girl0.hitbox, stationIdx: 0, name: "✦ Meet Sakura — Click for Isle Dossier", type: "guide" });
 
     // Sakura's flower garden & companion cat on the hero isle dock
+    // knees + shoes so a seated girl reads as a person, not a cone
+    [-0.24, 0.24].forEach((kx) => {
+      const knee = new T.Mesh(new T.CylinderGeometry(0.13, 0.11, 0.62, 7),
+        new T.MeshStandardMaterial({ color: 0xffdfc8, roughness: 0.7 }));
+      knee.position.set(kx, 0.62, 0.62);
+      knee.rotation.x = Math.PI * 0.42;
+      girl0.group.add(knee);
+      const shoe = new T.Mesh(new T.BoxGeometry(0.22, 0.14, 0.34),
+        new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.5 }));
+      shoe.position.set(kx, 0.5, 0.9);
+      girl0.group.add(shoe);
+    });
+
     const heroFlowers = createFlowerPatch(3.2, 20);
     heroFlowers.position.set(4.2, 9.6, 6.4);
     station0Group.add(heroFlowers);
@@ -5286,21 +5609,21 @@
     const girl3 = createGuideGirl({
       name: "Hikari", role: "The Astronomer",
       dressColor: 0x8b5cf6, hairColor: 0x0c0a09, accentColor: 0xfbbf24,
-      pose: "wave", scale: 2.75, stationIdx: 3,
+      pose: "wave", scale: 3.4, stationIdx: 3,
     });
-    girl3.group.position.set(2, 12, 34);
+    girl3.group.position.set(-2, 30, 30);
     station3Group.add(girl3.group);
     guideGirls.push(girl3);
-    floatingCrystals.push({ obj: girl3.group, baseY: 12, seed: 7.7 });
+    floatingCrystals.push({ obj: girl3.group, baseY: 30, seed: 7.7 });
     clickTargets.push({ mesh: girl3.hitbox, stationIdx: 3, name: "✦ Meet Hikari — Click for Constellation Dossier", type: "guide" });
 
     // Station 4: Rei — The Portal Priestess (beside the cosmic archway)
     const girl4 = createGuideGirl({
       name: "Rei", role: "The Portal Priestess",
       dressColor: 0xf43f5e, hairColor: 0x1e1b4b, accentColor: 0x38bdf8,
-      pose: "wave", scale: 2.6, stationIdx: 4,
+      pose: "wave", scale: 3.2, stationIdx: 4,
     });
-    girl4.group.position.set(13, 5.0, 16);
+    girl4.group.position.set(-10.5, 7.0, 17.0);
     girl4.group.rotation.y = -0.6;
     station4Group.add(girl4.group);
     guideGirls.push(girl4);
@@ -5588,19 +5911,24 @@
   // to drift them to (the wheel no longer zooms while scrolling the story).
   // The visitor's own choice is remembered in localStorage, so the realm
   // always reopens exactly how they like to travel.
-  const ZOOM_DEFAULT = 1.02; // HUD reads 98%
+  // HUD shows round(100 / zoomFactor): 0.935 -> 107%, 0.741 -> 135%.
+  // The constellation realm opens closer (135%) so Hikari and her star
+  // polyhedra fill the frame; every other realm opens at 107%.
+  const ZOOM_FOR_STATION = { 0: 0.935, 1: 0.935, 2: 0.935, 3: 0.741, 4: 0.935 };
+  const ZOOM_DEFAULT = 0.935; // HUD reads 107%
   const ZOOM_MIN = 0.35;
   const ZOOM_MAX = 3.0;
   const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   let savedZoom = 0;
-  try { savedZoom = Number(localStorage.getItem("isles-zoom-v2")) || 0; } catch {}
-  let zoomFactor = savedZoom ? clampZoom(savedZoom) : ZOOM_DEFAULT;
+  try { savedZoom = Number(localStorage.getItem("isles-zoom-v3")) || 0; } catch {}
+  let zoomFactor = savedZoom ? clampZoom(savedZoom)
+    : (ZOOM_FOR_STATION[FORCED_STATION === null ? 0 : FORCED_STATION] || ZOOM_DEFAULT);
   let targetZoomFactor = zoomFactor;
   let lastSavedZoom = zoomFactor;
   const rememberZoom = () => {
     if (Math.abs(targetZoomFactor - lastSavedZoom) < 0.005) return;
     lastSavedZoom = targetZoomFactor;
-    try { localStorage.setItem("isles-zoom-v2", String(targetZoomFactor)); } catch {}
+    try { localStorage.setItem("isles-zoom-v3", String(targetZoomFactor)); } catch {}
   };
 
   // Raycaster for 3D Island Beacons and Click Targets
@@ -5989,6 +6317,33 @@
         const t = (elapsedTime * 0.7 + d.userData.seed) % 1;
         d.position.y = d.userData.baseY + Math.sin(t * Math.PI) * 1.1;
         d.scale.setScalar(0.7 + Math.sin(t * Math.PI) * 0.5);
+      });
+    }
+
+    // The portal realm's sky drifts and glitters
+    if (window.__st4Sky) {
+      const s = window.__st4Sky;
+      s.galaxy.rotation.z += 0.00022;
+      s.nebulas.forEach((n, i) => { n.material.opacity = (i === 0 ? 0.5 : i === 1 ? 0.42 : i === 2 ? 0.34 : 0.36) + Math.sin(elapsedTime * 0.33 + i) * 0.06; });
+      s.moon.position.x = s.planet.position.x - 19 + Math.sin(elapsedTime * 0.25) * 3;
+      s.moon.position.y = s.planet.position.y + 8 + Math.cos(elapsedTime * 0.25) * 2.4;
+      s.stars.rotation.y += 0.00006;
+    }
+
+    // Animals at play behind the cottage: kittens circle, pets bounce
+    if (window.__parkPlay) {
+      const pk = window.__parkPlay;
+      pk.kittens.forEach((k) => {
+        k.a += 0.006 * k.speed * 6;
+        k.group.position.x = k.cx + Math.cos(k.a) * k.r;
+        k.group.position.z = k.cz + Math.sin(k.a) * k.r;
+        k.group.rotation.y = -k.a + Math.PI / 2;
+        k.group.position.y = 11.42 + Math.abs(Math.sin(elapsedTime * 4 + k.phase)) * 0.16;
+      });
+      pk.pets.forEach((p) => {
+        p.group.position.y = p.base.y + Math.abs(Math.sin(elapsedTime * 3.1 + p.phase)) * 0.42;
+        p.group.position.x = p.base.x + Math.sin(elapsedTime * 0.9 + p.phase) * 0.7;
+        p.group.rotation.y = Math.cos(elapsedTime * 0.9 + p.phase) * 0.5;
       });
     }
 
