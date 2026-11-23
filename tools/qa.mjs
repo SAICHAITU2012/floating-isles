@@ -87,6 +87,20 @@ await new Promise((res, rej) => {
   ws.onerror = rej;
 });
 
+// A Chrome crash or CDP hiccup must not surface as a bare node stack —
+// report it cleanly and exit 2 so CI can retry the station.
+const WATCHDOG_MS = 240000;
+const watchdog = setTimeout(() => {
+  console.error(JSON.stringify({ fatal: `watchdog: no CDP progress for ${WATCHDOG_MS}ms — chrome likely crashed or hung` }));
+  try { chrome.kill("SIGKILL"); } catch {}
+  process.exit(2);
+}, WATCHDOG_MS);
+ws.addEventListener("error", (e) => {
+  console.error(JSON.stringify({ fatal: `websocket error: ${(e && e.message) || e}` }));
+  try { chrome.kill("SIGKILL"); } catch {}
+  process.exit(2);
+});
+
 let id = 0;
 const pending = new Map();
 const events = [];
@@ -207,4 +221,5 @@ console.log(
 ws.close();
 chrome.kill("SIGKILL");
 await rm(profile, { recursive: true, force: true });
+clearTimeout(watchdog);
 process.exit(errors.length ? 1 : 0);

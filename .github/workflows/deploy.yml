@@ -80,19 +80,28 @@ jobs:
           fail=0
           for st in 0 1 2 3 4; do
             echo "== station $st =="
-            set +e
-            node tools/qa.mjs \
-              --url "http://127.0.0.1:8099/?at=$st" \
-              --out "qa/ci_st$st.png" \
-              --width 1280 --height 800 --wait 15000 \
-              --settle "$SETTLE" --settle-ms 60000 \
-              --probe "$PROBE" \
-              > "qa/ci_st$st.json" 2> "qa/ci_st$st.stderr"
-            rc=$?
+            # One retry per station: CI's software renderer occasionally
+            # crashes Chrome mid-boot (websocket drop); a clean re-run is
+            # cheaper than a false red ship gate.
+            rc=1
+            for attempt in 1 2; do
+              set +e
+              node tools/qa.mjs \
+                --url "http://127.0.0.1:8099/?at=$st" \
+                --out "qa/ci_st$st.png" \
+                --width 1280 --height 800 --wait 15000 \
+                --settle "$SETTLE" --settle-ms 60000 \
+                --probe "$PROBE" \
+                > "qa/ci_st$st.json" 2> "qa/ci_st$st.stderr"
+              rc=$?
+              set -e
+              [ $rc -eq 0 ] && break
+              echo "qa attempt $attempt failed at station $st (rc=$rc): $(head -3 qa/ci_st$st.stderr 2>/dev/null)"
+            done
             set -e
             cat "qa/ci_st$st.json" || true
             if [ $rc -ne 0 ]; then
-              echo "::error::qa.mjs exited $rc at station $st — see $(cat qa/ci_st$st.stderr | head -3)"
+              echo "::error::qa.mjs exited $rc at station $st after retry — see qa/ci_st$st.stderr artifact"
               fail=1
               continue
             fi

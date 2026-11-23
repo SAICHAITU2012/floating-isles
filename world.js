@@ -150,6 +150,7 @@
       shader.uniforms.uRimColor = { value: rimColor };
       shader.uniforms.uShadowTint = { value: shadowTint };
       shader.uniforms.uTime = { value: 0 };
+      shader.uniforms.uBellyWarmth = { value: opts.bellyWarmth || 0.0 };
 
       // Vertex shader modifications
       if (isFoliage) {
@@ -194,6 +195,7 @@
       shader.fragmentShader = `
         uniform vec3 uRimColor;
         uniform vec3 uShadowTint;
+        uniform float uBellyWarmth;
         varying vec3 vWorldNormal;
         varying vec3 vWorldPos;
         ${shader.fragmentShader}
@@ -227,6 +229,14 @@
         float rim = 1.0 - max(dot(V, N), 0.0);
         rim = smoothstep(0.82, 0.99, rim) * max(NdotL + 0.1, 0.0);
         gl_FragColor.rgb += uRimColor * rim * 0.18;
+
+        // Under-belly warmth (opt-in): downward faces catch a soft earthy
+        // bounce so island undersides read as sun-warmed rock shelves
+        // instead of black walls — the toon sun can never reach them.
+        if (uBellyWarmth > 0.0) {
+          float down = clamp(-N.y, 0.0, 1.0);
+          gl_FragColor.rgb += vec3(0.55, 0.34, 0.18) * down * uBellyWarmth;
+        }
         `
       );
 
@@ -268,6 +278,15 @@
   const bounceLight = new T.DirectionalLight(0xffeedd, 0.35);
   bounceLight.position.set(-60, 20, -50);
   scene.add(bounceLight);
+
+  // Warm under-isle glow — the hero isle's deep belly used to read as a
+  // black wall from orbit views, squashing whatever peeked beneath it.
+  // A warm light tucked under the lip turns the belly into a sun-kissed
+  // rock shelf and makes the crystal garden glow, so the distant isles
+  // showing below it read as clean depth layers instead of a jam.
+  const underGlow = new T.PointLight(0xffc48a, 3.2, 70, 1.6);
+  underGlow.position.set(0, -14, 6);
+  scene.add(underGlow);
 
   /* ── 4. PROCEDURAL ANIME SKY DOME & VOLUMETRIC CLOUDS ─────────────── */
 
@@ -811,7 +830,7 @@
       metalness: 0.05,
       flatShading: true,
     });
-    applyGhibliToon(rockMat, { shadowTint: new T.Color(0x2d3748) });
+    applyGhibliToon(rockMat, { shadowTint: new T.Color(0x2d3748), bellyWarmth: 0.9 });
 
     const grassMat = new T.MeshStandardMaterial({
       color: grassColor,
@@ -2885,8 +2904,9 @@
             child.material.emissive.set(0x000000);
             child.material.emissiveIntensity = 0.0;
             applyGhibliToon(child.material, {
-              shadowTint: new T.Color(0x284775),
+              shadowTint: new T.Color(0x3d5166),
               rimColor: new T.Color(0xfff5d8),
+              bellyWarmth: 2.0, // keep the deep belly a warm rock shelf, not a black wall
             });
           }
         }
@@ -2919,7 +2939,7 @@
       metalness: 0.1,
       flatShading: true,
     });
-    applyGhibliToon(rockMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0x94a3b8) });
+    applyGhibliToon(rockMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0x94a3b8), bellyWarmth: 1.7 });
 
     const rockTier1Geo = new T.CylinderGeometry(13.8, 11.2, 5.5, 18);
     const rockTier1 = new T.Mesh(rockTier1Geo, rockMat);
@@ -2999,7 +3019,7 @@
     // The waterfall lip sits at x≈0, z≈14, so nothing is placed in x −2…3
     // at z > 12 (that is the fall's channel).
     const underCrystalMat = new T.MeshStandardMaterial({
-      color: 0x7dd3fc, emissive: 0x22d3ee, emissiveIntensity: 3.6, roughness: 0.15,
+      color: 0x7dd3fc, emissive: 0x22d3ee, emissiveIntensity: 4.2, roughness: 0.15,
     });
     [
       // tier-1 rim (just under the upper rock shelf)
@@ -3010,6 +3030,11 @@
       [-8.5, -2.8, -2.5, 1.0], [1, -3.1, -7.5, 0.95],
       // deep GLB belly — seen from orbit mode and the flight corridors
       [-12, -12.2, -4, 1.15], [0.5, -13.6, -8, 0.95], [8, -12.6, 4.5, 1.1],
+      // lower fringe ring — dresses the belly's bottom silhouette, the edge
+      // distant isles peek out beneath when the camera orbits low
+      [-9.5, -14.2, 6.5, 0.9], [4.5, -14.6, 8.5, 1.0], [12, -13.2, -2.5, 0.95],
+      [-14.5, -13.0, 3.5, 1.0], [-5, -14.8, -6, 0.85], [6.5, -14.0, -9.5, 0.9],
+      [-3, -13.4, -12.5, 1.0], [10.5, -11.8, -8, 0.9],
     ].forEach(([x, y, z, s], i) => {
       const clus = new T.Group();
       clus.position.set(x, y - 0.4, z);
@@ -3035,6 +3060,8 @@
       [-9, 9.9, 9.5, 5.5], [-3.8, 10.1, 14.6, 4.6], [6.5, 10.0, 13.8, 5.0],
       [10.5, 9.7, 9.0, 4.2], [13.5, 9.5, 3.0, 3.6], [-13.5, 9.9, 4.5, 4.4],
       [-6, -2.2, 7.5, 3.4], [3.5, -2.3, 8.0, 3.0], [-9.5, -2.2, 0.5, 2.8],
+      // long strands down the deep belly's flanks for orbit views
+      [-12.5, -11.5, -3.5, 4.6], [7.5, -12.0, 4.0, 4.2], [1.0, -13.2, -7.5, 4.8],
     ].forEach(([x, y, z, len], i) => {
       const vine = createHangingVine(len);
       vine.position.set(x, y, z);
@@ -4940,6 +4967,13 @@
   window.__getCurrentProgress = () => currentStationProgress;
   window.__getZoomFactor = () => zoomFactor;
   window.__setZoom = (z) => { targetZoomFactor = Math.max(0.35, Math.min(3.0, z)); };
+  // QA/debug: drive the free-orbit state directly (radians, zoom multiplier)
+  window.__setOrbit = (yaw, pitch, zoom) => {
+    targetOrbitYaw = yaw;
+    targetOrbitPitch = pitch;
+    if (zoom) targetZoomFactor = Math.max(0.35, Math.min(3.0, zoom));
+  };
+  window.__getOrbit = () => ({ yaw: orbitYaw, pitch: orbitPitch, zoom: zoomFactor });
   window.__zoomIn = () => { targetZoomFactor = Math.max(0.35, targetZoomFactor * 0.80); };
   window.__zoomOut = () => { targetZoomFactor = Math.min(3.0, targetZoomFactor * 1.25); };
   window.__resetZoom = () => { targetZoomFactor = 1.0; targetOrbitYaw = 0; targetOrbitPitch = 0; };
