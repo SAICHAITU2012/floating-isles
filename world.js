@@ -63,7 +63,8 @@
   // Soft anime horizon fog: starts at 180, fades into sky at 850
   scene.fog = new T.Fog(0x60a5fa, 180, 850);
 
-  const camera = new T.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.2, 1200);
+  const initialAspect = window.innerWidth / window.innerHeight;
+  const camera = new T.PerspectiveCamera(initialAspect < 0.75 ? 58 : 45, initialAspect, 0.2, 1200);
   camera.position.set(0, 18, 55);
 
   window.__scene = scene;
@@ -1560,6 +1561,61 @@
     blushR.position.set(0.26, 2.78 + yOff, 0.40);
     blushR.rotation.y = 0.35;
     group.add(blushR);
+
+    // ── Smile: a gentle curve so she reads as warm and alive ──────────
+    const smile = new T.Mesh(
+      new T.TorusGeometry(0.09, 0.022, 5, 12, Math.PI),
+      new T.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.55 })
+    );
+    smile.position.set(0, 2.80 + yOff, 0.465);
+    smile.rotation.z = Math.PI;
+    group.add(smile);
+
+    // ── Hair ribbon bows (accent colour) on both sides ────────────────
+    const ribbonMat = new T.MeshStandardMaterial({ color: accentColor, roughness: 0.45, metalness: 0.15 });
+    [-0.56, 0.56].forEach((rx) => {
+      const k1 = new T.Mesh(new T.ConeGeometry(0.13, 0.26, 5), ribbonMat);
+      k1.position.set(rx - 0.08, 3.06 + yOff, -0.12);
+      k1.rotation.z = rx > 0 ? 0.9 : -0.9;
+      group.add(k1);
+      const k2 = new T.Mesh(new T.ConeGeometry(0.13, 0.26, 5), ribbonMat);
+      k2.position.set(rx + 0.08, 3.06 + yOff, -0.12);
+      k2.rotation.z = rx > 0 ? -0.9 : 0.9;
+      group.add(k2);
+      const knot = new T.Mesh(new T.SphereGeometry(0.06, 6, 6),
+        new T.MeshStandardMaterial({ color: 0xfffef5, roughness: 0.5 }));
+      knot.position.set(rx, 3.06 + yOff, -0.1);
+      group.add(knot);
+    });
+
+    // ── Glowing star hair-clip — her little constellation ─────────────
+    const starClip = new T.Mesh(
+      new T.OctahedronGeometry(0.14, 0),
+      new T.MeshStandardMaterial({ color: 0xfef08a, emissive: accentColor, emissiveIntensity: 1.9, roughness: 0.2 })
+    );
+    starClip.position.set(0.33, 3.16 + yOff, 0.16);
+    starClip.scale.set(1, 1.5, 1);
+    group.add(starClip);
+
+    // ── Three orbiting sparkles that circle her gently ────────────────
+    const sparkleMat = new T.MeshStandardMaterial({ color: 0xffffff, emissive: accentColor, emissiveIntensity: 1.6, roughness: 0.2 });
+    const sparkles = new T.Group();
+    for (let s = 0; s < 3; s++) {
+      const sp = new T.Mesh(new T.OctahedronGeometry(0.075, 0), sparkleMat);
+      const a = (s / 3) * Math.PI * 2;
+      sp.position.set(Math.cos(a) * 1.15, 1.6 + s * 0.5 + yOff, Math.sin(a) * 1.15);
+      sparkles.add(sp);
+    }
+    group.add(sparkles);
+
+    // ── Soft personal glow so she pops against any backdrop ───────────
+    const auraLight = new T.PointLight(accentColor, 0.85, 7, 2.0);
+    auraLight.position.set(0, 2.4 + yOff, 0.6);
+    group.add(auraLight);
+    group.userData.sparkles = sparkles;
+    if (!window.__guideSparkles) window.__guideSparkles = [];
+    window.__guideSparkles.push(group.userData.sparkles);
+
 
     // 4. Stylized Anime Hair (Bangs, Side Locks, and Twin Tails/Ponytail)
     const hairMat = new T.MeshStandardMaterial({ color: hairColor, roughness: 0.65, flatShading: true });
@@ -4272,7 +4328,7 @@
 
     // ── GRAND COLOURFUL FOUNTAIN — the archipelago's joyful centrepiece ──
     const archipelagoFountain = createColorfulFountain(1.55);
-    archipelagoFountain.position.set(-1.3, 2.32, 6.4); // well clear of the windmill
+    archipelagoFountain.position.set(-7.4, 2.32, 6.6); // well clear of the windmill
     millIsleG.add(archipelagoFountain);
     if (!window.__fountainSpinners) window.__fountainSpinners = [];
     window.__fountainSpinners.push(archipelagoFountain);
@@ -4317,6 +4373,111 @@
     pathKid.group.position.set(-5.4, 10.78, 5.0);
     pathKid.group.rotation.y = -1.1;
     station0Group.add(pathKid.group);
+
+    /* ── THE PLAY CORNER BESIDE THE COTTAGE ─────────────────────────────
+       A rainbow slide, a swing set and a seesaw on the open grass so the
+       house side of the isle never feels empty. Bright, chunky, cheerful. */
+    {
+      const playX = -13.2, playZ = 6.2, playY = 10.62;
+      const woodMat = new T.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.85, flatShading: true });
+      applyGhibliToon(woodMat, { shadowTint: new T.Color(0x7c2d12), rimColor: new T.Color(0xffedd5) });
+      const bucketMat = () => new T.MeshStandardMaterial({ color: 0x0ea5e9, roughness: 0.5, metalness: 0.3 });
+
+      // ── slide: platform + ladder + curved rainbow chute ──
+      const towerBase = new T.Mesh(new T.BoxGeometry(2.0, 0.3, 2.0),
+        new T.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.7 }));
+      towerBase.position.set(playX, playY + 0.15, playZ);
+      station0Group.add(towerBase);
+      [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].forEach(([dx, dz]) => {
+        const leg = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 3.0, 6), woodMat);
+        leg.position.set(playX + dx, playY + 1.5, playZ + dz);
+        station0Group.add(leg);
+      });
+      const deck = new T.Mesh(new T.BoxGeometry(1.9, 0.14, 1.9),
+        new T.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.65 }));
+      deck.position.set(playX, playY + 3.0, playZ);
+      station0Group.add(deck);
+      // little roof over the deck
+      const roofCone = new T.Mesh(new T.ConeGeometry(1.5, 0.9, 4),
+        new T.MeshStandardMaterial({ color: 0xec4899, roughness: 0.6, flatShading: true }));
+      roofCone.position.set(playX, playY + 4.0, playZ);
+      roofCone.rotation.y = Math.PI / 4;
+      station0Group.add(roofCone);
+      // ladder
+      for (let r = 0; r < 5; r++) {
+        const rung = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 1.0, 5), woodMat);
+        rung.rotation.z = Math.PI / 2;
+        rung.position.set(playX, playY + 0.5 + r * 0.6, playZ + 1.05);
+        station0Group.add(rung);
+      }
+      // rainbow chute — four coloured tube segments curving down
+      const slideCurve = new T.CatmullRomCurve3([
+        new T.Vector3(playX - 0.7, playY + 2.9, playZ - 0.9),
+        new T.Vector3(playX - 2.2, playY + 2.2, playZ - 1.9),
+        new T.Vector3(playX - 3.4, playY + 1.1, playZ - 2.6),
+        new T.Vector3(playX - 4.2, playY + 0.35, playZ - 3.0),
+      ]);
+      const slideColors = [0xf43f5e, 0xf59e0b, 0x22c55e, 0x3b82f6];
+      slideColors.forEach((c, i) => {
+        const seg = new T.Mesh(
+          new T.TubeGeometry(slideCurve, 24, 0.62, 8, false, i / 4, 1 / 4),
+          new T.MeshStandardMaterial({ color: c, roughness: 0.4, metalness: 0.2, side: T.DoubleSide })
+        );
+        station0Group.add(seg);
+      });
+
+      // ── swing set ──
+      const swX = playX + 4.6, swZ = playZ + 1.0;
+      const barMat = new T.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.5, metalness: 0.35 });
+      [-1, 1].forEach((s) => {
+        [-0.7, 0.7].forEach((dz) => {
+          const post = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 3.4, 6), barMat);
+          post.position.set(swX + s * 1.5, playY + 1.7, swZ + dz * 0.5);
+          post.rotation.z = -s * 0.16;
+          station0Group.add(post);
+        });
+      });
+      const crossbar = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, 3.4, 6), barMat);
+      crossbar.rotation.z = Math.PI / 2;
+      crossbar.position.set(swX, playY + 3.3, swZ);
+      station0Group.add(crossbar);
+      [-0.85, 0.85].forEach((dx, si) => {
+        [-0.28, 0.28].forEach((dz) => {
+          const rope = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, 1.7, 4),
+            new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 }));
+          rope.position.set(swX + dx + dz, playY + 2.45, swZ);
+          station0Group.add(rope);
+        });
+        const seat = new T.Mesh(new T.BoxGeometry(0.62, 0.09, 0.34),
+          new T.MeshStandardMaterial({ color: si === 0 ? 0x22d3ee : 0xa855f7, roughness: 0.5 }));
+        seat.position.set(swX + dx, playY + 1.6, swZ);
+        station0Group.add(seat);
+      });
+
+      // ── seesaw ──
+      const ssX = playX + 1.0, ssZ = playZ - 4.4;
+      const fulcrum = new T.Mesh(new T.ConeGeometry(0.55, 0.9, 4),
+        new T.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 }));
+      fulcrum.position.set(ssX, playY + 0.45, ssZ);
+      station0Group.add(fulcrum);
+      const plank = new T.Mesh(new T.BoxGeometry(4.6, 0.14, 0.7),
+        new T.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 }));
+      plank.position.set(ssX, playY + 0.95, ssZ);
+      plank.rotation.z = 0.16;
+      station0Group.add(plank);
+      [-2.0, 2.0].forEach((dx) => {
+        const knob = new T.Mesh(new T.SphereGeometry(0.13, 8, 6),
+          new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.5 }));
+        knob.position.set(ssX + dx, playY + 0.95 + dx * 0.16, ssZ);
+        station0Group.add(knob);
+      });
+
+      // ── a bright ball resting on the grass ──
+      const ball = new T.Mesh(new T.SphereGeometry(0.42, 12, 10), bucketMat());
+      ball.position.set(playX + 2.4, playY + 0.42, playZ + 3.4);
+      ball.castShadow = true;
+      station0Group.add(ball);
+    }
 
     attachModelSlot("windmill", millIsleG, 13.0, false, (mill) => {
       mill.position.set(-1.5, 2.32, -2.5);
@@ -4388,17 +4549,104 @@
       const bridgeMat = new T.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.9 });
       applyGhibliToon(bridgeMat);
       const from = { x: 2, y: 2.4, z: 18 }, to = { x: -4, y: 6.4, z: -10 };
+      const plankAt = (t) => ({
+        x: T.MathUtils.lerp(from.x, to.x, t),
+        y: T.MathUtils.lerp(from.y, to.y, t) - Math.sin(t * Math.PI) * 1.5,
+        z: T.MathUtils.lerp(from.z, to.z, t),
+      });
       for (let p = 1; p < 10; p++) {
         const t = p / 10;
         const plank = new T.Mesh(new T.BoxGeometry(1.4, 0.25, 1.4), bridgeMat);
-        plank.position.set(
-          T.MathUtils.lerp(from.x, to.x, t),
-          T.MathUtils.lerp(from.y, to.y, t) - Math.sin(t * Math.PI) * 1.5,
-          T.MathUtils.lerp(from.z, to.z, t)
-        );
+        const pp = plankAt(t);
+        plank.position.set(pp.x, pp.y, pp.z);
         plank.lookAt(to.x, to.y, to.z);
         station2Group.add(plank);
       }
+
+      /* ── Turn the bare bridge into a little festival crossing ──────
+         Gold catenary hand-rails, glowing lantern orbs at every third
+         plank, dancing strings of bunting, ivy and flowers along the
+         rope line, and drifting sparkle motes under the deck. */
+      const railMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.25 });
+      const vineMat = new T.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8, flatShading: true });
+      const bloomMat = new T.MeshStandardMaterial({ color: 0xf9a8d4, emissive: 0xec4899, emissiveIntensity: 0.45, roughness: 0.5 });
+      const lanternGlassMat = new T.MeshStandardMaterial({ color: 0xfef3c7, emissive: 0xffb020, emissiveIntensity: 1.9, roughness: 0.25 });
+      const lanternMetalMat = new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6, metalness: 0.4 });
+      const side = new T.Vector3(to.z - from.z, 0, -(to.x - from.x)).normalize().multiplyScalar(0.85);
+
+      for (let p = 0; p <= 20; p++) {
+        const t = p / 20;
+        const pp = plankAt(t);
+        [-1, 1].forEach((s) => {
+          // hand-rail: small gold posts
+          if (p % 2 === 0) {
+            const post = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 1.15, 5), railMat);
+            post.position.set(pp.x + side.x * s, pp.y + 0.62, pp.z + side.z * s);
+            station2Group.add(post);
+          }
+          // ivy + blossoms clinging to the rope line
+          if (p % 3 === 0) {
+            const leaf = new T.Mesh(new T.IcosahedronGeometry(0.2, 0), vineMat);
+            leaf.position.set(pp.x + side.x * s * 1.05, pp.y + 0.35 + Math.random() * 0.5, pp.z + side.z * s * 1.05);
+            leaf.scale.set(1, 0.7, 1);
+            station2Group.add(leaf);
+            if (p % 6 === 3) {
+              const bloom = new T.Mesh(new T.IcosahedronGeometry(0.12, 0), bloomMat);
+              bloom.position.set(leaf.position.x, leaf.position.y + 0.16, leaf.position.z);
+              station2Group.add(bloom);
+            }
+          }
+        });
+        // glowing lantern every third plank
+        if (p % 3 === 0 && p > 0 && p < 20) {
+          const arm = new T.Mesh(new T.CylinderGeometry(0.045, 0.045, 1.5, 5), railMat);
+          arm.rotation.z = Math.PI / 2;
+          arm.position.set(pp.x, pp.y + 1.25, pp.z);
+          arm.lookAt(to.x, pp.y + 1.25, to.z);
+          station2Group.add(arm);
+          const glass = new T.Mesh(new T.SphereGeometry(0.17, 8, 6), lanternGlassMat);
+          glass.position.set(pp.x + side.x * 0.85, pp.y + 1.12, pp.z + side.z * 0.85);
+          station2Group.add(glass);
+          const cap = new T.Mesh(new T.ConeGeometry(0.16, 0.14, 6), lanternMetalMat);
+          cap.position.set(glass.position.x, glass.position.y + 0.2, glass.position.z);
+          station2Group.add(cap);
+        }
+      }
+      // gold catenary rails on both sides
+      [-1, 1].forEach((s) => {
+        const pts = [];
+        for (let p = 0; p <= 18; p++) {
+          const t = p / 18;
+          const pp = plankAt(t);
+          pts.push(new T.Vector3(pp.x + side.x * s, pp.y + 1.18, pp.z + side.z * s));
+        }
+        const curve = new T.CatmullRomCurve3(pts);
+        const rail = new T.Mesh(new T.TubeGeometry(curve, 40, 0.045, 5, false), railMat);
+        station2Group.add(rail);
+      });
+      // bunting strung down the middle of the crossing
+      createFestiveBunting(
+        new T.Vector3(from.x, from.y + 2.0, from.z),
+        new T.Vector3(to.x, to.y + 2.0, to.z), 9
+      );
+      // drifting sparkle motes beneath the deck
+      const moteGeo = new T.BufferGeometry();
+      const moteN = 70;
+      const motePos = new Float32Array(moteN * 3);
+      for (let m = 0; m < moteN; m++) {
+        const t = Math.random();
+        const pp = plankAt(t);
+        motePos[m * 3] = pp.x + (Math.random() - 0.5) * 3.2;
+        motePos[m * 3 + 1] = pp.y - 0.2 - Math.random() * 2.4;
+        motePos[m * 3 + 2] = pp.z + (Math.random() - 0.5) * 3.2;
+      }
+      moteGeo.setAttribute("position", new T.BufferAttribute(motePos, 3));
+      const motes = new T.Points(moteGeo, new T.PointsMaterial({
+        color: 0xa5f3fc, size: 0.16, transparent: true, opacity: 0.85,
+        depthWrite: false, blending: T.AdditiveBlending, sizeAttenuation: true,
+      }));
+      station2Group.add(motes);
+      window.__bridgeMotes = motes;
     }
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -4991,7 +5239,7 @@
     const girl0 = createGuideGirl({
       name: "Sakura", role: "The Dreamer",
       dressColor: 0x06b6d4, hairColor: 0x451a03, accentColor: 0xf43f5e,
-      pose: "sit", scale: 1.35, stationIdx: 0,
+      pose: "sit", scale: 1.85, stationIdx: 0,
     });
     girl0.group.position.set(4.0, 11.35, 9.15);
     girl0.group.rotation.y = -0.45;
@@ -5014,7 +5262,7 @@
     const girl1 = createGuideGirl({
       name: "Hana", role: "The Architect",
       dressColor: 0xf59e0b, hairColor: 0x1c1917, accentColor: 0x8b5cf6,
-      pose: "read", scale: 1.35, stationIdx: 1,
+      pose: "read", scale: 2.2, stationIdx: 1,
     });
     girl1.group.position.set(-6, 3.2, 7);
     girl1.group.rotation.y = 0.6;
@@ -5026,7 +5274,7 @@
     const girl2 = createGuideGirl({
       name: "Yuki", role: "The Navigator",
       dressColor: 0x10b981, hairColor: 0x78350f, accentColor: 0x06b6d4,
-      pose: "wave", scale: 1.35, stationIdx: 2,
+      pose: "wave", scale: 2.3, stationIdx: 2,
     });
     girl2.group.position.set(6.2, 1.35, 22.5);
     girl2.group.rotation.y = -0.5;
@@ -5038,21 +5286,21 @@
     const girl3 = createGuideGirl({
       name: "Hikari", role: "The Astronomer",
       dressColor: 0x8b5cf6, hairColor: 0x0c0a09, accentColor: 0xfbbf24,
-      pose: "wave", scale: 1.4, stationIdx: 3,
+      pose: "wave", scale: 2.75, stationIdx: 3,
     });
-    girl3.group.position.set(0, 16, 0);
+    girl3.group.position.set(2, 12, 34);
     station3Group.add(girl3.group);
     guideGirls.push(girl3);
-    floatingCrystals.push({ obj: girl3.group, baseY: 16, seed: 7.7 });
+    floatingCrystals.push({ obj: girl3.group, baseY: 12, seed: 7.7 });
     clickTargets.push({ mesh: girl3.hitbox, stationIdx: 3, name: "✦ Meet Hikari — Click for Constellation Dossier", type: "guide" });
 
     // Station 4: Rei — The Portal Priestess (beside the cosmic archway)
     const girl4 = createGuideGirl({
       name: "Rei", role: "The Portal Priestess",
       dressColor: 0xf43f5e, hairColor: 0x1e1b4b, accentColor: 0x38bdf8,
-      pose: "wave", scale: 1.35, stationIdx: 4,
+      pose: "wave", scale: 2.6, stationIdx: 4,
     });
-    girl4.group.position.set(15, 5.0, 9);
+    girl4.group.position.set(13, 5.0, 16);
     girl4.group.rotation.y = -0.6;
     station4Group.add(girl4.group);
     guideGirls.push(girl4);
@@ -5317,6 +5565,7 @@
   window.addEventListener("scroll", updateScrollProgress, { passive: true });
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
+    camera.fov = camera.aspect < 0.75 ? 58 : 45;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     if (composer) composer.setSize(window.innerWidth, window.innerHeight);
@@ -5449,6 +5698,42 @@
     }
   });
 
+  /* ── Touch: two-finger pinch to zoom (phone & tablet) ──────────────
+     One finger still orbits, a plain vertical swipe still drives the
+     story. Pinch changes only the camera's zoom. */
+  const touchPointers = new Map();
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+  window.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchPointers.size === 2) {
+      const [a, b] = [...touchPointers.values()];
+      pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      pinchStartZoom = targetZoomFactor;
+      isDragging = false;
+      dragMoved = true;
+    }
+  }, { passive: true });
+
+  window.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "touch" || !touchPointers.has(e.pointerId)) return;
+    touchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchPointers.size === 2) {
+      const [a, b] = [...touchPointers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      targetZoomFactor = Math.max(0.35, Math.min(3.0, pinchStartZoom * (dist / pinchStartDist)));
+    }
+  }, { passive: true });
+
+  const dropTouch = (e) => {
+    if (e.pointerType !== "touch") return;
+    touchPointers.delete(e.pointerId);
+    if (touchPointers.size < 2) pinchStartDist = 0;
+  };
+  window.addEventListener("pointerup", dropTouch, { passive: true });
+  window.addEventListener("pointercancel", dropTouch, { passive: true });
+
   window.addEventListener("wheel", (e) => {
     if (e.target.closest("#cmdk, .mission-row, .panel")) return;
     if (e.ctrlKey) {
@@ -5555,7 +5840,10 @@
 
   function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
+    // Never burn GPU on a hidden tab; clamp the delta so a tab that comes
+    // back after minutes does not fast-forward every animation at once.
+    if (document.hidden) return;
+    const delta = Math.min(clock.getDelta(), 0.1);
     const elapsedTime = clock.getElapsedTime();
 
     adaptiveDprTick(performance.now(), delta * 1000);
@@ -5602,7 +5890,7 @@
     // Portrait phones have a much narrower horizontal FOV, so the same
     // waypoint would crop the isles left and right — pull back instead.
     const aspect = window.innerWidth / Math.max(1, window.innerHeight);
-    const viewScale = aspect < 1 ? 1 + (1 - aspect) * 0.78 : 1;
+    const viewScale = aspect < 1 ? 1 + (1 - aspect) * 1.45 : 1;
 
     const dist = baseOffset.length() * zoomFactor * viewScale;
 
@@ -5701,6 +5989,28 @@
         const t = (elapsedTime * 0.7 + d.userData.seed) % 1;
         d.position.y = d.userData.baseY + Math.sin(t * Math.PI) * 1.1;
         d.scale.setScalar(0.7 + Math.sin(t * Math.PI) * 0.5);
+      });
+    }
+
+    // Bridge motes drift upward like fireflies
+    if (window.__bridgeMotes) {
+      const arr = window.__bridgeMotes.geometry.attributes.position;
+      for (let i = 0; i < arr.count; i++) {
+        let y = arr.getY(i) + 0.012;
+        if (y > arr.getY(i) + 2.4) y -= 2.4;
+        arr.setY(i, y > 30 ? y - 3 : y);
+      }
+      arr.needsUpdate = true;
+      window.__bridgeMotes.rotation.y = Math.sin(elapsedTime * 0.2) * 0.02;
+    }
+
+    // Guide girls: orbiting sparkles and a gentle breathing sway
+    if (window.__guideSparkles) {
+      window.__guideSparkles.forEach((sp, i) => {
+        sp.rotation.y += 0.006 + i * 0.0012;
+        sp.children.forEach((c, k) => {
+          c.position.y += Math.sin(elapsedTime * 1.8 + k * 2.1 + i) * 0.0022;
+        });
       });
     }
 

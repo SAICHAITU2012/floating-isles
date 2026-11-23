@@ -986,3 +986,40 @@ html.no-world main { pointer-events: auto; }
 html.no-world .station { min-height: auto; padding-top: 96px; padding-bottom: 48px; }
 html.no-world .station-expand-pill { position: static !important; transform: none !important; opacity: 1; visibility: visible; pointer-events: auto; margin-top: 8px; }
 html.no-world .reveal { opacity: 1 !important; transform: none !important; }
+
+@media (max-width: 560px) {
+  /* Comfortable thumbs: bigger tap targets, safe-area aware, no stray zoom */
+  body { -webkit-tap-highlight-color: transparent; }
+  .zoom-hud {
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+    padding: 4px;
+    gap: 4px;
+  }
+  .zoom-hud button {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 18px !important;
+    border-radius: 12px;
+  }
+  .zoom-hud .zoom-val { min-width: 44px; font-size: 12px; }
+  .site-nav { padding-left: env(safe-area-inset-left, 0px); }
+  .station-expand-pill {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    transform: none !important;
+    justify-content: center;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .station-expand-pill .pill-desc,
+  .station-expand-pill .pill-meta { display: none; }
+  #orbit-hint { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .minimap-card { width: 132px; }
+  .minimap-card #minimap-canvas { width: 132px; height: 90px; }
+}
+
+@media (max-width: 420px) {
+  .minimap-card { display: none; }
+  .journey { display: none; }
+}
