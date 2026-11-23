@@ -2912,6 +2912,33 @@
         }
       });
       heroIslandSlot.add(heroIsland);
+
+      // ── The Fox Grove ────────────────────────────────────────────────
+      // nimzu's GLB bakes 6 small meshes deep INSIDE the rock mass
+      // (world ≈ (-7,-4,-13)) — a tall stump, canopy crowns, branching
+      // poles and a fox-like figure — visible only through crevices.
+      // Lift the whole cluster out and plant it on the grass top as a
+      // visible feature, keeping its original internal arrangement.
+      const FOX_GROVE = ["polySurface944_tree_body_0", "polySurface945_tree1_0", "polySurface946_tree2_0", "polySurface947_tree1_0", "polySurface948_tree_body_0", "polySurface949_tree_body_0"];
+      heroIsland.updateMatrixWorld(true);
+      const toLift = [];
+      heroIsland.traverse((c) => { if (c.isMesh && FOX_GROVE.includes(c.name)) toLift.push(c); });
+      if (toLift.length === FOX_GROVE.length) {
+        const groveBox = new T.Box3();
+        const groveCenters = toLift.map((c) => { groveBox.setFromObject(c); return groveBox.getCenter(new T.Vector3()); });
+        const groveCentroid = groveCenters.reduce((a, b) => a.add(b), new T.Vector3()).multiplyScalar(1 / groveCenters.length);
+        const GROVE_POS = new T.Vector3(7.0, 16.0, 4.0); // open centre-right grass, clear of pond, dock, birches and rock
+        toLift.forEach((c, i) => {
+          c.geometry.computeBoundingBox();
+          const gbc = c.geometry.boundingBox.getCenter(new T.Vector3());
+          c.geometry.translate(-gbc.x, -gbc.y, -gbc.z); // recenter baked model-space vertices
+          c.geometry.computeBoundingSphere();
+          station0Group.attach(c);        // keep world transform, re-parent out of the rock
+          c.rotation.set(0, Math.PI, 0);  // face the default camera
+          c.scale.setScalar(0.85);        // slightly magnified so the fox figure reads
+          c.position.copy(groveCenters[i]).sub(groveCentroid).add(GROVE_POS);
+        });
+      }
     });
 
     // Solid Grassy Mountain Bedrock Foundation
