@@ -1,8 +1,11 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = '/Users/saichaitu/.gemini/antigravity/scratch/ss-portfolio-floating-islands-experiment';
+// serve the repo root relative to this file — never a hardcoded machine path
+// (a hardcoded /Users/... made every CI request 404 and the page never loaded)
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const MIME = {
   '.html': 'text/html',
