@@ -54,25 +54,60 @@ jobs:
       - name: Render every station in headless Chrome and gate on errors
         env:
           CI: "1"
-          CHROME_BIN: /usr/bin/google-chrome
         run: |
           set -e
-          command -v google-chrome >/dev/null || { echo "google-chrome not found on runner"; exit 1; }
+          # find a Chrome binary (runner images differ)
+          CHROME_BIN=""
+          for c in google-chrome google-chrome-stable chromium chromium-browser; do
+            if command -v "$c" >/dev/null 2>&1; then CHROME_BIN="$c"; break; fi
+          done
+          if [ -z "$CHROME_BIN" ]; then
+            echo "::error::No Chrome/Chromium found on the runner — cannot run render QA"
+            exit 1
+          fi
+          echo "using chrome: $CHROME_BIN"
+          export CHROME_BIN
+          fail=0
           for st in 0 1 2 3 4; do
             echo "== station $st =="
+            set +e
             node tools/qa.mjs \
               --url "http://127.0.0.1:8099/?at=$st" \
               --out "qa/ci_st$st.png" \
-              --width 1280 --height 800 --wait 8000 \
+              --width 1280 --height 800 --wait 8000 --settle-ms 45000 \
               --settle "Boolean(window.__WORLD_LOADED)" \
               --probe "JSON.stringify({loaded:!!window.__WORLD_LOADED})" \
-              | tee "qa/ci_st$st.json"
+              > "qa/ci_st$st.json" 2> "qa/ci_st$st.stderr"
+            rc=$?
+            set -e
+            cat "qa/ci_st$st.json" || true
+            if [ $rc -ne 0 ]; then
+              echo "::error::qa.mjs exited $rc at station $st — see $(cat qa/ci_st$st.stderr | head -3)"
+              fail=1
+              continue
+            fi
             node -e "
-              const r = JSON.parse(require('fs').readFileSync('qa/ci_st$st.json','utf8'));
-              if (!r.probe || !JSON.parse(r.probe).loaded) { console.error('world did not load at station $st'); process.exit(1); }
-              if ((r.errors||[]).length) { console.error('console errors at station $st:', r.errors); process.exit(1); }
-            "
+              const fs = require('fs');
+              let r; try { r = JSON.parse(fs.readFileSync('qa/ci_st$st.json','utf8')); }
+              catch (e) { console.error('::error::unparseable qa report at station $st'); process.exit(1); }
+              const loaded = r.probe && JSON.parse(r.probe).loaded;
+              if (!loaded) { console.error('::error::world did NOT load at station ' + '$st' + ' — errors: ' + JSON.stringify(r.errors)); process.exit(1); }
+              if ((r.errors||[]).length) { console.error('::error::console errors at station ' + '$st' + ': ' + JSON.stringify(r.errors)); process.exit(1); }
+              console.log('station $st OK — 0 errors, world loaded');
+            " || fail=1
           done
+          exit $fail
+
+      - name: Upload QA evidence (always, for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-evidence
+          path: |
+            qa/ci_st*.json
+            qa/ci_st*.png
+            qa/ci_st*.stderr
+          if-no-files-found: ignore
 
   deploy:
     name: Publish to GitHub Pages
