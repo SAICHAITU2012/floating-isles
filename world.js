@@ -1748,99 +1748,117 @@
     function createSingleKnight(isLeft) {
       const kGroup = new T.Group();
 
-      // Pedestal Stone Base
-      const baseGeo = new T.CylinderGeometry(1.8, 2.2, 1.2, 8);
-      const baseMat = new T.MeshStandardMaterial({ color: 0x334155, roughness: 0.9, flatShading: true });
-      const base = new T.Mesh(baseGeo, baseMat);
-      base.position.y = 0.6;
-      kGroup.add(base);
+      // ── Elegant tapered pedestal with a gold collar ──────────────────
+      const baseMat = new T.MeshStandardMaterial({ color: 0x475569, roughness: 0.85, flatShading: true });
+      applyGhibliToon(baseMat, { shadowTint: new T.Color(0x1e293b), rimColor: new T.Color(0xcbd5e1) });
+      const goldMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.8, roughness: 0.22 });
+      const steelMat = new T.MeshStandardMaterial({ color: 0x64748b, metalness: 0.65, roughness: 0.35, flatShading: true });
+      const darkSteel = new T.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5, roughness: 0.45, flatShading: true });
+      const glowCyan = new T.MeshBasicMaterial({ color: 0x67e8f9 });
 
-      // Armored Greaves / Boots
-      const legMat = new T.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7, metalness: 0.3 });
-      const legL = new T.Mesh(new T.CylinderGeometry(0.35, 0.45, 2.4, 8), legMat);
-      legL.position.set(-0.6, 2.4, 0);
-      kGroup.add(legL);
-      const legR = new T.Mesh(new T.CylinderGeometry(0.35, 0.45, 2.4, 8), legMat);
-      legR.position.set(0.6, 2.4, 0);
-      kGroup.add(legR);
+      const base = new T.Mesh(new T.CylinderGeometry(1.7, 2.15, 0.9, 8), baseMat);
+      base.position.y = 0.45; kGroup.add(base);
+      const baseGold = new T.Mesh(new T.TorusGeometry(1.72, 0.08, 6, 8), goldMat);
+      baseGold.rotation.x = Math.PI / 2; baseGold.position.y = 0.9; kGroup.add(baseGold);
+      const baseStep = new T.Mesh(new T.CylinderGeometry(1.25, 1.5, 0.42, 8), baseMat);
+      baseStep.position.y = 1.12; kGroup.add(baseStep);
 
-      // Torso & Obsidian Cuirass
-      const cuirassGeo = new T.BoxGeometry(1.6, 2.2, 1.2);
-      const cuirassMat = new T.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.6 });
-      const cuirass = new T.Mesh(cuirassGeo, cuirassMat);
-      cuirass.position.y = 4.6;
-      kGroup.add(cuirass);
+      // ── Flowing cape behind the knight ───────────────────────────────
+      const capeMat = new T.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.85, side: T.DoubleSide, flatShading: true });
+      const cape = new T.Mesh(new T.ConeGeometry(1.55, 4.5, 8, 1, true, Math.PI * 0.18, Math.PI * 0.64), capeMat);
+      cape.position.set(0, 3.95, -0.55); cape.rotation.x = 0.05; kGroup.add(cape);
 
-      // Glowing Cyan Crest Emblem on Chest
-      const crestMesh = new T.Mesh(
-        new T.OctahedronGeometry(0.35, 0),
-        new T.MeshStandardMaterial({ color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 2.2 })
+      // ── Armoured legs, gold knee guards, rounded boots ───────────────
+      [-0.55, 0.55].forEach((lx) => {
+        const leg = new T.Mesh(new T.CylinderGeometry(0.3, 0.38, 2.4, 8), steelMat);
+        leg.position.set(lx, 2.5, 0); leg.castShadow = true; kGroup.add(leg);
+        const knee = new T.Mesh(new T.SphereGeometry(0.34, 8, 8), goldMat);
+        knee.position.set(lx, 2.78, 0.16); knee.scale.set(1, 0.78, 0.9); kGroup.add(knee);
+        const boot = new T.Mesh(new T.SphereGeometry(0.42, 8, 7), darkSteel);
+        boot.position.set(lx, 1.3, 0.1); boot.scale.set(0.95, 0.6, 1.3); kGroup.add(boot);
+      });
+
+      // ── Rounded ornate cuirass, gold trim, glowing heart crest ───────
+      const cuirass = new T.Mesh(new T.CylinderGeometry(1.05, 0.86, 2.3, 10), darkSteel);
+      cuirass.position.y = 4.55; cuirass.castShadow = true; kGroup.add(cuirass);
+      const chestBand = new T.Mesh(new T.TorusGeometry(0.94, 0.07, 6, 12), goldMat);
+      chestBand.rotation.x = Math.PI / 2; chestBand.position.y = 3.95; kGroup.add(chestBand);
+      const collarBand = new T.Mesh(new T.TorusGeometry(0.8, 0.07, 6, 12), goldMat);
+      collarBand.rotation.x = Math.PI / 2; collarBand.position.y = 5.32; kGroup.add(collarBand);
+      const crest = new T.Mesh(
+        new T.OctahedronGeometry(0.34, 0),
+        new T.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x06b6d4, emissiveIntensity: 2.4, roughness: 0.15 })
       );
-      crestMesh.position.set(0, 4.8, 0.65);
-      crestMesh.scale.set(1.0, 1.3, 0.3);
-      kGroup.add(crestMesh);
+      crest.position.set(0, 4.75, 0.9); crest.scale.set(1, 1.35, 0.4); kGroup.add(crest);
 
-      // Broad Tiered Shoulder Pauldrons
-      const pauldronMat = new T.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
-      const pL = new T.Mesh(new T.BoxGeometry(0.8, 0.6, 1.1), pauldronMat);
-      pL.position.set(-1.1, 5.5, 0);
-      kGroup.add(pL);
-      const pR = new T.Mesh(new T.BoxGeometry(0.8, 0.6, 1.1), pauldronMat);
-      pR.position.set(1.1, 5.5, 0);
-      kGroup.add(pR);
+      // ── Rounded pauldrons with gold rims and small spikes ────────────
+      [-1.12, 1.12].forEach((px) => {
+        const p = new T.Mesh(new T.SphereGeometry(0.52, 10, 8), steelMat);
+        p.position.set(px, 5.32, 0); p.scale.set(1, 0.76, 1.02); p.castShadow = true; kGroup.add(p);
+        const rim = new T.Mesh(new T.TorusGeometry(0.49, 0.055, 5, 10), goldMat);
+        rim.rotation.x = Math.PI / 2; rim.position.set(px, 5.04, 0); kGroup.add(rim);
+        const spike = new T.Mesh(new T.ConeGeometry(0.11, 0.34, 5), goldMat);
+        spike.position.set(px, 5.72, 0); kGroup.add(spike);
+      });
 
-      // Knight Helm & Glowing Visor
-      const helmGeo = new T.BoxGeometry(1.0, 1.2, 1.0);
-      const helmMat = new T.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.4 });
-      const helm = new T.Mesh(helmGeo, helmMat);
-      helm.position.y = 6.4;
-      kGroup.add(helm);
+      // ── Cute-yet-strong helm: rounded dome, glowing eyes, gold plume ─
+      const helm = new T.Mesh(new T.SphereGeometry(0.62, 12, 10), steelMat);
+      helm.position.y = 6.35; helm.scale.set(1, 1.05, 0.98); helm.castShadow = true; kGroup.add(helm);
+      const visorBand = new T.Mesh(new T.BoxGeometry(0.92, 0.15, 0.1), darkSteel);
+      visorBand.position.set(0, 6.32, 0.55); kGroup.add(visorBand);
+      [-0.2, 0.2].forEach((ex) => {
+        const eye = new T.Mesh(new T.SphereGeometry(0.075, 8, 8), glowCyan);
+        eye.position.set(ex, 6.33, 0.6); kGroup.add(eye);
+      });
+      const circlet = new T.Mesh(new T.TorusGeometry(0.6, 0.055, 5, 12), goldMat);
+      circlet.rotation.x = Math.PI / 2; circlet.position.y = 6.62; kGroup.add(circlet);
+      const plume = new T.Mesh(new T.ConeGeometry(0.2, 0.92, 6), new T.MeshStandardMaterial({ color: 0xef4444, roughness: 0.7 }));
+      plume.position.set(0, 7.12, -0.12); kGroup.add(plume);
+      // cheek fins — the "cute" detail
+      [-0.62, 0.62].forEach((fx) => {
+        const fin = new T.Mesh(new T.ConeGeometry(0.09, 0.3, 4), goldMat);
+        fin.position.set(fx, 6.3, 0.1); fin.rotation.z = fx > 0 ? -1.1 : 1.1; kGroup.add(fin);
+      });
 
-      const visorGeo = new T.BoxGeometry(0.8, 0.18, 0.1);
-      const visorMat = new T.MeshBasicMaterial({ color: 0x38bdf8 });
-      const visor = new T.Mesh(visorGeo, visorMat);
-      visor.position.set(0, 6.4, 0.52);
-      kGroup.add(visor);
-
-      // Staff Shoulder/Hand Pivot
+      // ── Slender golden staff: glowing star + orbiting rune ring ──────
       const staffPivot = new T.Group();
       staffPivot.position.set(isLeft ? 0.95 : -0.95, 4.2, 0.8);
-
-      // 13.5m Tall Ornate Guardian Staff (sized to the knight's full height)
-      const staffHaftGeo = new T.CylinderGeometry(0.14, 0.14, 13.5, 8);
-      const staffHaftMat = new T.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.25 });
-      const haft = new T.Mesh(staffHaftGeo, staffHaftMat);
-      haft.position.set(0, 6.4, 0);
-      staffPivot.add(haft);
-
-      // Glowing Runic Star Crystal at Staff Head
+      const haft = new T.Mesh(new T.CylinderGeometry(0.1, 0.14, 13.5, 8), goldMat);
+      haft.position.set(0, 6.4, 0); staffPivot.add(haft);
+      [2.2, 5.2, 8.6].forEach((by) => {
+        const band = new T.Mesh(
+          new T.TorusGeometry(0.15, 0.04, 5, 10),
+          new T.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x0284c7, emissiveIntensity: 1.3 })
+        );
+        band.rotation.x = Math.PI / 2; band.position.y = by; staffPivot.add(band);
+      });
       const crystalHead = new T.Mesh(
         new T.OctahedronGeometry(0.85, 0),
-        new T.MeshStandardMaterial({
-          color: 0x38bdf8,
-          emissive: 0x0284c7,
-          emissiveIntensity: 2.5,
-          roughness: 0.1,
-        })
+        new T.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 2.6, roughness: 0.1, metalness: 0.2 })
       );
-      crystalHead.position.set(0, 13.4, 0);
-      staffPivot.add(crystalHead);
+      crystalHead.position.set(0, 13.4, 0); staffPivot.add(crystalHead);
+      const runeRing = new T.Mesh(
+        new T.TorusGeometry(1.15, 0.05, 5, 20),
+        new T.MeshStandardMaterial({ color: 0xa5f3fc, emissive: 0x22d3ee, emissiveIntensity: 1.8 })
+      );
+      runeRing.position.set(0, 13.4, 0); runeRing.rotation.x = Math.PI * 0.5;
+      staffPivot.add(runeRing);
+      staffPivot.userData.runeRing = runeRing;
+      const crownLight = new T.PointLight(0x67e8f9, 1.3, 16, 1.8);
+      crownLight.position.set(0, 13.4, 0); staffPivot.add(crownLight);
 
       kGroup.add(staffPivot);
-
       return { kGroup, staffPivot };
     }
 
     const left = createSingleKnight(true);
     left.kGroup.position.set(-7.5, 0, 0);
-    // Crossed X barrier angle (points inward across gate center)
     left.staffPivot.rotation.z = -0.82;
     left.staffPivot.userData.crossedZ = -0.82;
     group.add(left.kGroup);
 
     const right = createSingleKnight(false);
     right.kGroup.position.set(7.5, 0, 0);
-    // Crossed X barrier angle (points inward across gate center)
     right.staffPivot.rotation.z = 0.82;
     right.staffPivot.userData.crossedZ = 0.82;
     group.add(right.kGroup);
@@ -1850,6 +1868,99 @@
       leftPivot: left.staffPivot,
       rightPivot: right.staffPivot,
     };
+  }
+
+  /**
+   * Constructs a Grand Ornamental Fountain — tiered stone basins with gold
+   * trim, glowing turquoise water, arcing jets, drifting petals and a
+   * rotating golden orb. Colourful, cosy and made for the archipelago.
+   */
+  function createColorfulFountain(scale = 1) {
+    const g = new T.Group();
+    g.scale.setScalar(scale);
+
+    const stoneMat = new T.MeshStandardMaterial({ color: 0xdbe4ee, roughness: 0.85, flatShading: true });
+    applyGhibliToon(stoneMat, { shadowTint: new T.Color(0x64748b), rimColor: new T.Color(0xffffff) });
+    const stoneDeep = new T.MeshStandardMaterial({ color: 0x9fb0c4, roughness: 0.9, flatShading: true });
+    const goldMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.75, roughness: 0.25 });
+    const waterMat = new T.MeshStandardMaterial({
+      color: 0x22d3ee, emissive: 0x0891b2, emissiveIntensity: 0.9,
+      transparent: true, opacity: 0.82, roughness: 0.15, metalness: 0.1,
+    });
+    const waterBright = new T.MeshStandardMaterial({
+      color: 0xa5f3fc, emissive: 0x67e8f9, emissiveIntensity: 1.4,
+      transparent: true, opacity: 0.9, roughness: 0.1,
+    });
+
+    // ── Base basin (octagonal, deep rim with gold band) ──────────────
+    const base = new T.Mesh(new T.CylinderGeometry(2.9, 3.15, 0.62, 8), stoneMat);
+    base.position.y = 0.31; base.castShadow = true; base.receiveShadow = true;
+    g.add(base);
+    const baseRim = new T.Mesh(new T.TorusGeometry(2.86, 0.1, 6, 8), goldMat);
+    baseRim.rotation.x = Math.PI / 2; baseRim.position.y = 0.6;
+    g.add(baseRim);
+    const water1 = new T.Mesh(new T.CylinderGeometry(2.68, 2.68, 0.12, 8), waterMat);
+    water1.position.y = 0.6; g.add(water1);
+
+    // ── Pedestal + upper bowl ────────────────────────────────────────
+    const pedestal = new T.Mesh(new T.CylinderGeometry(0.62, 0.95, 1.5, 8), stoneDeep);
+    pedestal.position.y = 1.35; pedestal.castShadow = true; g.add(pedestal);
+    const collar = new T.Mesh(new T.TorusGeometry(0.66, 0.09, 6, 10), goldMat);
+    collar.rotation.x = Math.PI / 2; collar.position.y = 2.05; g.add(collar);
+
+    const bowl = new T.Mesh(new T.CylinderGeometry(1.62, 1.05, 0.42, 10), stoneMat);
+    bowl.position.y = 2.3; bowl.castShadow = true; g.add(bowl);
+    const bowlRim = new T.Mesh(new T.TorusGeometry(1.6, 0.075, 6, 10), goldMat);
+    bowlRim.rotation.x = Math.PI / 2; bowlRim.position.y = 2.5; g.add(bowlRim);
+    const water2 = new T.Mesh(new T.CylinderGeometry(1.48, 1.48, 0.1, 10), waterMat);
+    water2.position.y = 2.52; g.add(water2);
+
+    // ── Central fountain head: golden orb + spinning ring ────────────
+    const pedestal2 = new T.Mesh(new T.CylinderGeometry(0.3, 0.42, 0.9, 8), stoneDeep);
+    pedestal2.position.y = 2.95; g.add(pedestal2);
+    const orb = new T.Mesh(
+      new T.IcosahedronGeometry(0.46, 0),
+      new T.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 1.5, metalness: 0.8, roughness: 0.2 })
+    );
+    orb.position.y = 3.62; orb.castShadow = true; g.add(orb);
+    const orbRing = new T.Mesh(new T.TorusGeometry(0.78, 0.055, 6, 18), goldMat);
+    orbRing.position.y = 3.62; orbRing.rotation.x = Math.PI * 0.42; g.add(orbRing);
+
+    // ── Arcing water jets from the upper bowl (8 directions) ─────────
+    const jets = new T.Group();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const jet = new T.Mesh(new T.CylinderGeometry(0.055, 0.14, 1.5, 5), waterBright);
+      jet.position.set(Math.cos(a) * 1.15, 2.62, Math.sin(a) * 1.15);
+      jet.rotation.z = Math.cos(a) * -0.75;
+      jet.rotation.x = Math.sin(a) * 0.75;
+      jets.add(jet);
+    }
+    g.add(jets);
+
+    // ── Drifting petals on the lower water disc ──────────────────────
+    const petalMats = [0xf43f5e, 0xf59e0b, 0xa855f7, 0x10b981, 0x38bdf8, 0xec4899].map(
+      (c) => new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.4, flatShading: true })
+    );
+    const petals = new T.Group();
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.7 + Math.random() * 1.8;
+      const p = new T.Mesh(new T.ConeGeometry(0.11, 0.16, 4), petalMats[i % petalMats.length]);
+      p.position.set(Math.cos(a) * r, 0.69 + Math.random() * 0.03, Math.sin(a) * r);
+      p.rotation.set(Math.random(), Math.random() * 3, Math.random());
+      petals.add(p);
+    }
+    g.add(petals);
+
+    // ── Colourful glow: warm orb light + cool water light ────────────
+    const warm = new T.PointLight(0xffd166, 1.5, 14, 1.8);
+    warm.position.set(0, 3.6, 0); g.add(warm);
+    const cool = new T.PointLight(0x67e8f9, 1.2, 12, 1.7);
+    cool.position.set(0, 0.9, 0); g.add(cool);
+
+    g.userData.spin = { orb, orbRing, jets, petals };
+    return g;
   }
 
   /**
@@ -2196,9 +2307,9 @@
     group.add(torso);
 
     // Head
-    const headGeo = new T.SphereGeometry(0.38, 10, 10);
+    const headGeo = new T.SphereGeometry(0.44, 14, 12);
     const head = new T.Mesh(headGeo, skinMat);
-    head.position.y = 1.88;
+    head.position.y = 1.92;
     head.castShadow = true;
     group.add(head);
 
@@ -2225,17 +2336,40 @@
     }
     group.add(hairGroup);
 
-    // Anime Eyes & Cheerful Blush
-    const eyeMat = new T.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3 });
-    const blushMat = new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.9, transparent: true, opacity: 0.75 });
-    [-0.14, 0.14].forEach((ex) => {
-      const eye = new T.Mesh(new T.SphereGeometry(0.065, 6, 6), eyeMat);
-      eye.position.set(ex, 1.88, 0.34);
+    // Anime Eyes & Cheerful Blush — big glossy eyes with highlights + a smile
+    const eyeMat = new T.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.25 });
+    const scleraMat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+    const shineMat = new T.MeshBasicMaterial({ color: 0xffffff });
+    const blushMat = new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.9, transparent: true, opacity: 0.6 });
+    [-0.15, 0.15].forEach((ex) => {
+      // white of the eye
+      const sclera = new T.Mesh(new T.SphereGeometry(0.095, 8, 8), scleraMat);
+      sclera.position.set(ex, 1.94, 0.375);
+      sclera.scale.set(1, 1.18, 0.55);
+      group.add(sclera);
+      // dark pupil
+      const eye = new T.Mesh(new T.SphereGeometry(0.062, 8, 8), eyeMat);
+      eye.position.set(ex, 1.94, 0.42);
+      eye.scale.set(1, 1.15, 0.5);
       group.add(eye);
-      const blush = new T.Mesh(new T.SphereGeometry(0.06, 6, 6), blushMat);
-      blush.position.set(ex * 1.5, 1.80, 0.32);
+      // sparkle highlight
+      const shine = new T.Mesh(new T.SphereGeometry(0.026, 6, 6), shineMat);
+      shine.position.set(ex + 0.018, 1.985, 0.455);
+      group.add(shine);
+      // rosy cheek blush
+      const blush = new T.Mesh(new T.SphereGeometry(0.07, 6, 6), blushMat);
+      blush.position.set(ex * 1.55, 1.845, 0.36);
+      blush.scale.set(1, 0.72, 0.4);
       group.add(blush);
     });
+    // happy little smile
+    const smile = new T.Mesh(
+      new T.TorusGeometry(0.075, 0.019, 5, 12, Math.PI),
+      new T.MeshStandardMaterial({ color: 0x9f1239, roughness: 0.6 })
+    );
+    smile.position.set(0, 1.80, 0.415);
+    smile.rotation.z = Math.PI;
+    group.add(smile);
 
     // Arms & Pivots
     const armGeo = new T.CylinderGeometry(0.09, 0.08, 0.65, 6);
@@ -2244,6 +2378,9 @@
     const armLMesh = new T.Mesh(armGeo, shirtMat);
     armLMesh.position.y = -0.28;
     armL.add(armLMesh);
+    const handL = new T.Mesh(new T.SphereGeometry(0.095, 7, 6), skinMat);
+    handL.position.y = -0.62;
+    armL.add(handL);
     group.add(armL);
 
     const armR = new T.Group();
@@ -2251,6 +2388,9 @@
     const armRMesh = new T.Mesh(armGeo, shirtMat);
     armRMesh.position.y = -0.28;
     armR.add(armRMesh);
+    const handR = new T.Mesh(new T.SphereGeometry(0.095, 7, 6), skinMat);
+    handR.position.y = -0.62;
+    armR.add(handR);
     group.add(armR);
 
     // Legs & Pivots
@@ -2293,10 +2433,23 @@
       armL.rotation.z = -Math.PI * 0.7;
       armR.rotation.z = Math.PI * 0.7;
     } else if (pose === "jump") {
-      armL.rotation.z = -Math.PI * 0.6;
-      armR.rotation.z = Math.PI * 0.6;
-      legL.rotation.x = 0.5;
-      legR.rotation.x = -0.5;
+      // joyful mid-air leap: arms thrown up in a V, knees tucked back
+      armL.rotation.z = -Math.PI * 0.78;
+      armL.rotation.x = -0.28;
+      armR.rotation.z = Math.PI * 0.78;
+      armR.rotation.x = -0.28;
+      legL.rotation.x = 0.62;
+      legR.rotation.x = -0.42;
+      legL.position.set(-0.20, 0.80, 0.06);
+      legR.position.set(0.20, 0.72, -0.04);
+      torso.rotation.x = -0.1;
+    } else if (pose === "play") {
+      // playful run-and-chase: leaning forward, one arm swinging forward
+      torso.rotation.x = 0.18;
+      armL.rotation.x = 0.85;
+      armR.rotation.x = -0.7;
+      legL.rotation.x = -0.55;
+      legR.rotation.x = 0.5;
     }
 
     // Balloon accessory
@@ -3150,96 +3303,6 @@
       });
     }
 
-    // 2c. THE UNDER-ISLE HUT — a cosy storybook cottage on a hanging stone
-    // terrace tucked against the belly's front-left face (clear of the
-    // waterfall channel x −2…3 at z>12). Warm lamplight under the island
-    // makes the underside feel lived-in and welcoming from every angle.
-    const hutTimberMat = new T.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.85, flatShading: true });
-    applyGhibliToon(hutTimberMat, { shadowTint: new T.Color(0x4a3728) });
-    const underHut = new T.Group();
-    underHut.position.set(-17.4, -5.6, 8.9);
-    underHut.rotation.y = 0.55;
-    // hanging stone terrace — tapers downward, embedding up into the belly
-    const terraceRock = new T.Mesh(new T.CylinderGeometry(3.2, 2.1, 3.0, 9), rockMat);
-    terraceRock.position.y = -1.3;
-    terraceRock.castShadow = true;
-    terraceRock.receiveShadow = true;
-    underHut.add(terraceRock);
-    // grass cap so the terrace reads as a little hanging meadow
-    const terraceGrass = new T.Mesh(new T.CylinderGeometry(2.9, 2.65, 0.5, 9), grassTopMat);
-    terraceGrass.position.y = 0.35;
-    terraceGrass.castShadow = true;
-    terraceGrass.receiveShadow = true;
-    underHut.add(terraceGrass);
-    // small stone pad so the hut sits clearly ON the meadow, its base never
-    // swallowed by the terrace rim from shallow camera angles
-    const hutPadMat = new T.MeshStandardMaterial({ color: 0x8b9bad, roughness: 0.95, flatShading: true });
-    applyGhibliToon(hutPadMat, { shadowTint: new T.Color(0x334155), rimColor: new T.Color(0xd7dee8) });
-    const hutPad = new T.Mesh(new T.CylinderGeometry(1.7, 1.9, 0.3, 9), hutPadMat);
-    hutPad.position.set(0.1, 0.72, 0.2);
-    hutPad.castShadow = true;
-    hutPad.receiveShadow = true;
-    underHut.add(hutPad);
-    // the hut itself — same storybook palette as the cottage above
-    attachModelSlot("cottage", underHut, 4.4, false, (m) => {
-      m.position.set(0.1, 0.95, 0.2);
-      m.rotation.set(0, 0.5, 0);
-      repaintStorybookCottage(m);
-    });
-    // suspension: a stout timber bracket arm braced into the belly plus two
-    // hemp tethers — the hut hangs BESIDE the rock in open air (never under
-    // an overhang), so it is visible from the establishing camera, from zoomed
-    // views and from orbit-under angles alike (raycast-verified)
-    const hangRopeMat = new T.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
-    function tieBar(a, b, radius) {
-      const dir = new T.Vector3().subVectors(b, a);
-      const len = dir.length();
-      const bar = new T.Mesh(new T.CylinderGeometry(radius, radius, len, 6), hangRopeMat);
-      bar.position.copy(a).addScaledVector(dir, 0.5);
-      bar.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.normalize());
-      bar.castShadow = true;
-      return bar;
-    }
-    // bracket arm: buried end inside the belly, foot on the terrace's inner rim
-    station0Group.add(tieBar(new T.Vector3(-11.6, -2.0, 6.9), new T.Vector3(-14.6, -5.9, 7.5), 0.24));
-    // two taut tethers from the terrace rim up into the rock
-    station0Group.add(tieBar(new T.Vector3(-16.2, -6.2, 6.4), new T.Vector3(-10.6, -0.6, 4.8), 0.06));
-    station0Group.add(tieBar(new T.Vector3(-18.2, -6.4, 10.6), new T.Vector3(-12.0, -1.0, 9.8), 0.06));
-    // a warm lantern on the terrace rim
-    const hutLanternPost = new T.Mesh(new T.CylinderGeometry(0.06, 0.09, 1.5, 6), hutTimberMat);
-    hutLanternPost.position.set(2.35, 1.1, 1.3);
-    underHut.add(hutLanternPost);
-    const hutLanternFlame = new T.Mesh(
-      new T.SphereGeometry(0.22, 10, 8),
-      new T.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 2.6, roughness: 0.3 })
-    );
-    hutLanternFlame.position.set(2.35, 1.95, 1.3);
-    underHut.add(hutLanternFlame);
-    // a few glowing blossoms on the meadow
-    [[1.4, 0.85, 1.9, 0xe11d48], [-1.7, 0.85, 1.5, 0xf59e0b], [0.4, 0.85, -2.2, 0x38bdf8]].forEach(([fx, fy, fz, c]) => {
-      const flower = new T.Mesh(
-        new T.SphereGeometry(0.14, 8, 6),
-        new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7, roughness: 0.4 })
-      );
-      flower.position.set(fx, fy, fz);
-      underHut.add(flower);
-    });
-    // ivy trailing off the terrace rim
-    const hutVine = createHangingVine(3.2);
-    hutVine.position.set(-2.6, 0.2, 0.8);
-    underHut.add(hutVine);
-    // a second lantern on the far rim + a soft warm glow so the hut
-    // reads as a welcoming light under the isle, not a dark shape
-    const hutLanternPost2 = new T.Mesh(new T.CylinderGeometry(0.06, 0.09, 1.3, 6), hutTimberMat);
-    hutLanternPost2.position.set(-2.3, 1.0, -1.6);
-    underHut.add(hutLanternPost2);
-    const hutLanternFlame2 = hutLanternFlame.clone();
-    hutLanternFlame2.position.set(-2.3, 1.75, -1.6);
-    underHut.add(hutLanternFlame2);
-    const hutGlow = new T.PointLight(0xffc98a, 1.8, 20, 1.7);
-    hutGlow.position.set(0, 1.6, 0);
-    underHut.add(hutGlow);
-    station0Group.add(underHut);
 
     // 2. The Storybook Cottage on the open left flank of the crest —
     // bigger, recoloured (cream walls, terracotta roof, honey timber,
@@ -3949,6 +4012,13 @@
     const millIsland = createFantasyIsland(13.0, 20.0, 4, 0x57534e, 0x22c55e);
     millIsland.position.y = 0.5;
     millIsleG.add(millIsland);
+
+    // ── GRAND COLOURFUL FOUNTAIN — the archipelago's joyful centrepiece ──
+    const archipelagoFountain = createColorfulFountain(1.55);
+    archipelagoFountain.position.set(-0.4, 1.05, 2.6);
+    millIsleG.add(archipelagoFountain);
+    if (!window.__fountainSpinners) window.__fountainSpinners = [];
+    window.__fountainSpinners.push(archipelagoFountain);
 
     attachModelSlot("windmill", millIsleG, 13.0, false, (mill) => {
       mill.position.set(-1.5, 1.25, -2.5);
@@ -4704,6 +4774,7 @@
     // ═══════════════════════════════════════════════════════════════════
     const guardians = createPortalGuardians();
     guardians.group.position.set(0, 0, 6);
+    guardians.group.scale.setScalar(1.35); // stronger, more imposing presence
     station4Group.add(guardians.group);
     // The staffs part like a salute as the traveller nears the gate
     portalStaffPivots = { left: guardians.leftPivot, right: guardians.rightPivot };
@@ -5262,6 +5333,11 @@
     // Guardian salute: the crossed staffs swing completely upright as the
     // traveller nears the gate — nothing bars the way
     if (portalStaffPivots) {
+      // slowly orbiting rune ring on each staff crown
+      if (portalStaffPivots.left.userData.runeRing) {
+        portalStaffPivots.left.userData.runeRing.rotation.z += 0.008;
+        portalStaffPivots.right.userData.runeRing.rotation.z -= 0.008;
+      }
       const near = Math.min(Math.max((currentStationProgress - 3.3) / 0.6, 0), 1);
       const open = near * near * (3 - 2 * near); // smoothstep
       portalStaffPivots.left.rotation.z = portalStaffPivots.left.userData.crossedZ * (1 - open);
@@ -5296,6 +5372,21 @@
         if (item.speedZ) item.obj.rotation.z += item.speedZ;
       }
     });
+
+    // Animate the archipelago fountain — spinning orb, ring, jets & petals
+    if (window.__fountainSpinners) {
+      window.__fountainSpinners.forEach((f) => {
+        const s = f.userData.spin;
+        if (!s) return;
+        s.orb.rotation.y += 0.012;
+        s.orb.position.y = 3.62 + Math.sin(elapsedTime * 1.6) * 0.07;
+        s.orbRing.rotation.z += 0.02;
+        s.jets.children.forEach((jet, i) => {
+          jet.scale.y = 0.85 + Math.sin(elapsedTime * 4 + i * 0.8) * 0.22;
+        });
+        s.petals.rotation.y += 0.0028;
+      });
+    }
 
     // Animate Carnival Rides (Ferris Wheel & Carousel)
     carnivalRides.forEach((ride) => {
