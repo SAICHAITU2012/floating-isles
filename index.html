@@ -31,24 +31,41 @@
 
   <!-- ══ boot ══ -->
   <div id="boot" aria-label="Loading Floating Realm">
-    <div class="boot-backdrop"></div>
+    <!-- animated sky: stars, nebula clouds, drifting 3D islands -->
+    <div class="boot-sky" aria-hidden="true">
+      <div class="boot-stars"></div>
+      <div class="boot-nebula n1"></div>
+      <div class="boot-nebula n2"></div>
+      <div class="boot-nebula n3"></div>
+      <div class="boot-isles">
+        <div class="b-isle b-isle-a"><span class="b-grass"></span><span class="b-rock"></span><span class="b-tree t1"></span><span class="b-tree t2"></span><span class="b-gem"></span><span class="b-tower"><i class="b-roof"></i><i class="b-lit"></i></span><span class="b-waterfall"></span></div>
+        <div class="b-isle b-isle-b"><span class="b-grass"></span><span class="b-rock"></span><span class="b-tree t1"></span><span class="b-gem"></span></div>
+        <div class="b-isle b-isle-c"><span class="b-grass"></span><span class="b-rock"></span><span class="b-tree t1"></span></div>
+      </div>
+    </div>
+
     <div class="boot-inner">
       <div class="boot-sigil">
-        <svg viewBox="0 0 90 90" width="90" height="90">
-          <circle cx="45" cy="45" r="42" fill="none" stroke="rgba(56,189,248,0.2)" stroke-width="1.5" stroke-dasharray="3 5" class="boot-ring-outer"/>
-          <circle cx="45" cy="45" r="34" fill="none" stroke="rgba(232,121,249,0.35)" stroke-width="1.5" stroke-dasharray="6 8" class="boot-ring"/>
+        <svg viewBox="0 0 90 90" width="96" height="96">
+          <circle cx="45" cy="45" r="42" fill="none" stroke="rgba(56,189,248,0.22)" stroke-width="1.5" stroke-dasharray="3 5" class="boot-ring-outer"/>
+          <circle cx="45" cy="45" r="34" fill="none" stroke="rgba(232,121,249,0.4)" stroke-width="1.5" stroke-dasharray="6 8" class="boot-ring"/>
           <polygon points="45,12 76,68 14,68" fill="none" stroke="#67e8f9" stroke-width="2" class="boot-tri"/>
           <circle cx="45" cy="48" r="6" fill="#38bdf8" class="boot-dot"/>
-          <path d="M28 58 Q45 44 62 58" fill="none" stroke="#e879f9" stroke-width="1.5" opacity="0.8"/>
+          <path d="M28 58 Q45 44 62 58" fill="none" stroke="#e879f9" stroke-width="1.5" opacity="0.85"/>
+          <circle cx="20" cy="24" r="2.2" fill="#fbbf24" class="boot-orbit-dot"/>
+          <circle cx="70" cy="66" r="1.8" fill="#a7f3d0" class="boot-orbit-dot d2"/>
         </svg>
       </div>
-      <div class="boot-title disp">THE FLOATING REALM</div>
-      <div class="boot-subtitle mono">S. SADHASRI // 3D FANTASY SKY ARCHIPELAGO · 島</div>
+
+      <h1 class="boot-title disp">WELCOME TO <span class="boot-name">SADHA'S UNIVERSE</span></h1>
+      <p class="boot-welcome">a little world where <em>magic</em>, <em>imagination</em>, and <em>technology</em> come alive.</p>
+
       <div class="boot-progress-wrap">
         <div class="boot-bar"><div class="boot-bar-fill" id="boot-bar-fill"></div></div>
         <div class="boot-pct mono" id="boot-pct">0%</div>
       </div>
       <div class="boot-status mono" id="boot-status">awakening fantasy universe · spinning sky islands…</div>
+      <div class="boot-hint mono">click anywhere to enter</div>
     </div>
   </div>
 

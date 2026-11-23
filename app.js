@@ -30,6 +30,8 @@
 
   function finishBoot() {
     if (!boot || boot.classList.contains("done")) return;
+    // ?bootdebug keeps the welcome screen up for design review
+    if (new URLSearchParams(location.search).has("bootdebug")) return;
     if (bootFill) bootFill.style.width = "100%";
     if (bootPct) bootPct.textContent = "100%";
     if (bootStatus) bootStatus.textContent = "sky realm manifested · ascending…";

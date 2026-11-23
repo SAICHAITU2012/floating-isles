@@ -3747,11 +3747,63 @@
       new T.Vector3(0.0, waterSurfaceY + 0.02, 13.4),
     ]);
     const stream = new T.Mesh(
-      makeWaterRibbon(streamCurve, 56, (t) => 2.4 + Math.sin(t * Math.PI) * 7.6),
+      makeWaterRibbon(streamCurve, 72, (t) => 4.4 + Math.sin(t * Math.PI) * 10.6),
       waterfallMat
     );
     station0Group.add(stream);
+    window.__streamCurve = streamCurve;
+    window.__waterY = waterSurfaceY;
 
+    /* ── THE STREAM, DRESSED FOR A FESTIVAL ──────────────────────────────
+       Now that the water runs wide, give it life: glowing pebbles along
+       both banks, drifting petals that ride the current, colourful koi,
+       and rainbow light playing on the surface. */
+    {
+      const pebbleSpecs = [
+        [0x38bdf8, 0x22d3ee], [0xf472b6, 0xec4899], [0xfbbf24, 0xf59e0b], [0xa78bfa, 0x8b5cf6],
+      ];
+      window.__streamPetals = [];
+      for (let i = 0; i < 26; i++) {
+        const t = Math.random();
+        const p = streamCurve.getPoint(t);
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const off = (4.4 + Math.sin(t * Math.PI) * 10.6) * 0.5 * side;
+        const spec = pebbleSpecs[i % pebbleSpecs.length];
+        // glowing bank pebble
+        const peb = new T.Mesh(new T.IcosahedronGeometry(0.16 + Math.random() * 0.14, 0),
+          new T.MeshStandardMaterial({ color: spec[0], emissive: spec[1], emissiveIntensity: 1.3, roughness: 0.35, flatShading: true }));
+        peb.position.set(p.x + off, waterSurfaceY + 0.12, p.z + (Math.random() - 0.5) * 1.2);
+        station0Group.add(peb);
+        // petal drifting on the current
+        if (i % 2 === 0) {
+          const petal = new T.Mesh(new T.CircleGeometry(0.19, 6),
+            new T.MeshStandardMaterial({ color: [0xf9a8d4, 0xfde68a, 0xc4b5fd, 0xa7f3d0][i % 4], roughness: 0.55, side: T.DoubleSide }));
+          petal.rotation.x = -Math.PI / 2;
+          petal.position.set(p.x + (Math.random() - 0.5) * 2.2, waterSurfaceY + 0.09, p.z);
+          petal.userData.t = t;
+          petal.userData.side = (Math.random() - 0.5) * 2.2;
+          station0Group.add(petal);
+          window.__streamPetals.push(petal);
+        }
+      }
+      // two colourful koi gliding the current
+      window.__koi = [];
+      [0xf97316, 0xf43f5e].forEach((c, i) => {
+        const koi = new T.Group();
+        const body = new T.Mesh(new T.SphereGeometry(0.26, 10, 8),
+          new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, roughness: 0.4 }));
+        body.scale.set(1.7, 0.75, 0.9);
+        koi.add(body);
+        const tail = new T.Mesh(new T.ConeGeometry(0.2, 0.42, 5),
+          new T.MeshStandardMaterial({ color: 0xfff7ed, roughness: 0.45 }));
+        tail.rotation.z = -Math.PI / 2;
+        tail.position.x = -0.5;
+        koi.add(tail);
+        koi.userData.t = i * 0.35;
+        station0Group.add(koi);
+        window.__koi.push(koi);
+      });
+    }
     // Expanding ripple rings at both ends of the story
     window.__springRipples = [];
     const rippleMat = () => new T.MeshBasicMaterial({
@@ -4597,19 +4649,19 @@
       kittenColors.forEach((c, i) => {
         const k = createCat(c);
         const a = (i / 3) * Math.PI * 2;
-        k.group.position.set(6.2 + Math.cos(a) * 1.5, 11.42, 9.8 + Math.sin(a) * 1.1);
-        k.group.scale.setScalar(1.9);
+        k.group.position.set(6.6 + Math.cos(a) * 1.0, 11.33, 10.4 + Math.sin(a) * 0.8);
+        k.group.scale.setScalar(0.72);
         station0Group.add(k.group);
         catAnimData.push(k);
-        playground.kittens.push({ group: k.group, cx: 6.2, cz: 9.8, r: 1.5, a, speed: 0.7 + i * 0.12, phase: i * 2.1 });
+        playground.kittens.push({ group: k.group, cx: 6.6, cz: 10.4, rx: 1.0, rz: 0.8, r: 1.0, a, speed: 0.5 + i * 0.1, phase: i * 2.1 });
       });
       // puppy
       const puppy = createCat(0xd97706);
-      puppy.group.scale.setScalar(2.3);
-      puppy.group.position.set(2.4, 11.42, 9.9);
+      puppy.group.scale.setScalar(0.9);
+      puppy.group.position.set(2.2, 11.33, 10.6);
       station0Group.add(puppy.group);
       catAnimData.push(puppy);
-      playground.pets.push({ group: puppy.group, base: new T.Vector3(2.4, 11.42, 9.9), phase: 0 });
+      playground.pets.push({ group: puppy.group, base: new T.Vector3(2.2, 11.33, 10.6), phase: 0, r: 0.5 });
       // bunny
       const bunnyG = new T.Group();
       const bBody = new T.Mesh(new T.SphereGeometry(0.3, 10, 8),
@@ -4627,10 +4679,10 @@
         ear.rotation.z = s * 0.16;
         bunnyG.add(ear);
       });
-      bunnyG.scale.setScalar(1.8);
-      bunnyG.position.set(8.0, 11.42, 10.6);
+      bunnyG.scale.setScalar(0.75);
+      bunnyG.position.set(7.4, 11.33, 8.6);
       station0Group.add(bunnyG);
-      playground.pets.push({ group: bunnyG, base: new T.Vector3(8.0, 11.42, 10.6), phase: 1.6 });
+      playground.pets.push({ group: bunnyG, base: new T.Vector3(7.4, 11.33, 8.6), phase: 1.6, r: 0.45 });
       window.__parkPlay = playground;
     }
 
@@ -5609,21 +5661,21 @@
     const girl3 = createGuideGirl({
       name: "Hikari", role: "The Astronomer",
       dressColor: 0x8b5cf6, hairColor: 0x0c0a09, accentColor: 0xfbbf24,
-      pose: "wave", scale: 3.4, stationIdx: 3,
+      pose: "wave", scale: 3.0, stationIdx: 3,
     });
-    girl3.group.position.set(-2, 30, 30);
+    girl3.group.position.set(6, 34, 26);
     station3Group.add(girl3.group);
     guideGirls.push(girl3);
-    floatingCrystals.push({ obj: girl3.group, baseY: 30, seed: 7.7 });
+    floatingCrystals.push({ obj: girl3.group, baseY: 34, seed: 7.7 });
     clickTargets.push({ mesh: girl3.hitbox, stationIdx: 3, name: "✦ Meet Hikari — Click for Constellation Dossier", type: "guide" });
 
     // Station 4: Rei — The Portal Priestess (beside the cosmic archway)
     const girl4 = createGuideGirl({
       name: "Rei", role: "The Portal Priestess",
       dressColor: 0xf43f5e, hairColor: 0x1e1b4b, accentColor: 0x38bdf8,
-      pose: "wave", scale: 3.2, stationIdx: 4,
+      pose: "wave", scale: 2.7, stationIdx: 4,
     });
-    girl4.group.position.set(-10.5, 7.0, 17.0);
+    girl4.group.position.set(13, 5.0, 16);
     girl4.group.rotation.y = -0.6;
     station4Group.add(girl4.group);
     guideGirls.push(girl4);
@@ -6320,6 +6372,26 @@
       });
     }
 
+    // Petals and koi ride the stream
+    if (window.__streamPetals) {
+      window.__streamPetals.forEach((pt) => {
+        pt.userData.t = (pt.userData.t + 0.00035) % 1;
+        const p = window.__streamCurve.getPoint(pt.userData.t);
+        pt.position.x = p.x + pt.userData.side;
+        pt.position.z = p.z;
+        pt.rotation.z += 0.004;
+      });
+    }
+    if (window.__koi) {
+      window.__koi.forEach((k) => {
+        k.userData.t = (k.userData.t + 0.00022) % 1;
+        const p = window.__streamCurve.getPoint(k.userData.t);
+        k.position.set(p.x + Math.sin(k.userData.t * 18) * 1.1, window.__waterY + 0.16, p.z);
+        const ahead = window.__streamCurve.getPoint(Math.min(1, k.userData.t + 0.01));
+        k.rotation.y = Math.atan2(ahead.x - p.x, ahead.z - p.z);
+      });
+    }
+
     // The portal realm's sky drifts and glitters
     if (window.__st4Sky) {
       const s = window.__st4Sky;
@@ -6335,15 +6407,16 @@
       const pk = window.__parkPlay;
       pk.kittens.forEach((k) => {
         k.a += 0.006 * k.speed * 6;
-        k.group.position.x = k.cx + Math.cos(k.a) * k.r;
-        k.group.position.z = k.cz + Math.sin(k.a) * k.r;
+        k.group.position.x = k.cx + Math.cos(k.a) * k.rx;
+        k.group.position.z = k.cz + Math.sin(k.a) * k.rz;
         k.group.rotation.y = -k.a + Math.PI / 2;
-        k.group.position.y = 11.42 + Math.abs(Math.sin(elapsedTime * 4 + k.phase)) * 0.16;
+        k.group.position.y = 11.33 + Math.abs(Math.sin(elapsedTime * 4 + k.phase)) * 0.16;
       });
       pk.pets.forEach((p) => {
-        p.group.position.y = p.base.y + Math.abs(Math.sin(elapsedTime * 3.1 + p.phase)) * 0.42;
-        p.group.position.x = p.base.x + Math.sin(elapsedTime * 0.9 + p.phase) * 0.7;
-        p.group.rotation.y = Math.cos(elapsedTime * 0.9 + p.phase) * 0.5;
+        p.group.position.y = p.base.y + Math.abs(Math.sin(elapsedTime * 3.1 + p.phase)) * 0.26;
+        p.group.position.x = p.base.x + Math.sin(elapsedTime * 0.9 + p.phase) * (p.r || 0.7);
+        p.group.position.z = p.base.z + Math.cos(elapsedTime * 0.9 + p.phase) * (p.r || 0.7) * 0.7;
+        p.group.rotation.y = Math.cos(elapsedTime * 0.9 + p.phase) * 0.6;
       });
     }
 
