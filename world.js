@@ -3338,6 +3338,154 @@
     station0Group.add(cottageFlowersR);
     station0Group.add(makeLanternPost(-12.9, 0.6, 2.4));
 
+    // ═══════════════════════════════════════════════════════════════════
+    // THE COTTAGE BELOW — a lower islet hanging beneath the hero isle's
+    // belly: its own rocky tiers, grass crown, warm lamp-lit cottage, a
+    // smoking chimney, a flower garden, a picket fence and lanterns.
+    // This is the layered "cottage below the island" look, made real and
+    // permanently visible from the default camera and from below.
+    // ═══════════════════════════════════════════════════════════════════
+    const lowerIsle = new T.Group();
+    lowerIsle.position.set(-12.0, -1.6, 17.5);
+    lowerIsle.rotation.y = 0.28;
+    lowerIsle.scale.setScalar(1.45); // big enough to read as a real village below
+    station0Group.add(lowerIsle);
+
+    const lowerRockMat = new T.MeshStandardMaterial({ color: 0x6f5b48, roughness: 0.95, flatShading: true });
+    applyGhibliToon(lowerRockMat, { shadowTint: new T.Color(0x3d5166), rimColor: new T.Color(0xfff5d8), bellyWarmth: 1.6 });
+    [[6.6, 5.8, 3.0, 0.2], [5.4, 4.4, 2.8, -2.4], [3.9, 2.7, 3.2, -4.8], [2.3, 0.5, 3.4, -7.4]]
+      .forEach(([r1, r2, h, y]) => {
+        const tier = new T.Mesh(new T.CylinderGeometry(r1, r2, h, 9), lowerRockMat);
+        tier.position.y = y; tier.castShadow = true; tier.receiveShadow = true;
+        lowerIsle.add(tier);
+      });
+    const lowerGrassMat = new T.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.85, flatShading: true });
+    applyGhibliToon(lowerGrassMat, { shadowTint: new T.Color(0x14532d), rimColor: new T.Color(0xbbf7d0) });
+    const lowerGrass = new T.Mesh(new T.CylinderGeometry(6.7, 6.0, 1.0, 12), lowerGrassMat);
+    lowerGrass.position.y = 1.75; lowerGrass.castShadow = true; lowerGrass.receiveShadow = true;
+    lowerIsle.add(lowerGrass);
+
+    // the cottage itself — warm windows, terracotta roof
+    attachModelSlot("cottage", lowerIsle, 5.4, false, (m) => {
+      m.position.set(0.4, 2.6, 0.2);
+      m.rotation.set(0, 0.55, 0);
+      repaintStorybookCottage(m);
+      clickTargets.push({ mesh: m, stationIdx: 0, name: "The Cottage Below", type: "house" });
+    });
+
+    // smoking chimney with drifting puffs
+    const chimMat = new T.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9, flatShading: true });
+    const chimney = new T.Mesh(new T.BoxGeometry(0.5, 1.5, 0.5), chimMat);
+    chimney.position.set(2.2, 5.2, -0.9);
+    lowerIsle.add(chimney);
+    window.__chimneySmoke = [];
+    for (let i = 0; i < 4; i++) {
+      const puff = new T.Mesh(
+        new T.SphereGeometry(0.28 + i * 0.07, 7, 6),
+        new T.MeshStandardMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.42 - i * 0.08, roughness: 1 })
+      );
+      puff.position.set(2.2 + (i % 2 ? 0.12 : -0.1), 5.9 + i * 0.6, -0.9);
+      puff.userData.baseY = puff.position.y;
+      puff.userData.seed = i * 1.7;
+      lowerIsle.add(puff);
+      window.__chimneySmoke.push(puff);
+    }
+
+    // flower garden, glowing mushrooms, picket fence, lanterns
+    const lowerFlowers = createFlowerPatch(3.2, 22);
+    lowerFlowers.position.set(-2.4, 2.3, 1.5);
+    lowerIsle.add(lowerFlowers);
+    const lowerMush = createGlowingMushroomCluster(0x22d3ee, 4);
+    lowerMush.position.set(3.6, 2.25, 1.9);
+    lowerIsle.add(lowerMush);
+    const fenceMat = new T.MeshStandardMaterial({ color: 0xf5e2b8, roughness: 0.85 });
+    for (let i = 0; i < 10; i++) {
+      const a = -0.45 + (i / 9) * 1.85;
+      const post = new T.Mesh(new T.BoxGeometry(0.13, 0.95, 0.13), fenceMat);
+      post.position.set(Math.cos(a) * 4.5, 2.75, Math.sin(a) * 4.5 + 0.7);
+      post.rotation.y = -a;
+      lowerIsle.add(post);
+      if (i < 9) {
+        const a2 = -0.45 + ((i + 1) / 9) * 1.85;
+        const rail = new T.Mesh(new T.BoxGeometry(0.06, 0.1, 0.62), fenceMat);
+        rail.position.set((Math.cos(a) + Math.cos(a2)) * 2.25, 3.05, (Math.sin(a) + Math.sin(a2)) * 2.25 + 0.7);
+        rail.rotation.y = -(a + a2) / 2 + Math.PI / 2;
+        lowerIsle.add(rail);
+      }
+    }
+    // doorway lantern post + warm light
+    const lowerLampPost = new T.Mesh(new T.CylinderGeometry(0.07, 0.1, 1.7, 6),
+      new T.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 }));
+    lowerLampPost.position.set(2.6, 3.5, 2.0);
+    lowerIsle.add(lowerLampPost);
+    const lowerLampFlame = new T.Mesh(new T.SphereGeometry(0.24, 10, 8),
+      new T.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 2.8, roughness: 0.3 }));
+    lowerLampFlame.position.set(2.6, 4.45, 2.0);
+    lowerIsle.add(lowerLampFlame);
+    const lowerLamp = new T.PointLight(0xffc98a, 2.2, 22, 1.7);
+    lowerLamp.position.set(0.6, 4.2, 2.6);
+    lowerIsle.add(lowerLamp);
+    // stone doorstep path
+    [[0.4, 2.75, 2.6], [0.2, 2.72, 3.5], [0.0, 2.7, 4.3]].forEach(([px, py, pz], i) => {
+      const st = new T.Mesh(new T.CylinderGeometry(0.5 - i * 0.05, 0.56 - i * 0.05, 0.16, 7), padMat);
+      st.position.set(px, py, pz);
+      lowerIsle.add(st);
+    });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ISLAND 0 AMENITIES — lantern posts along the path, a bench facing
+    // the pond, a rope swing on the oak, a wildflower meadow, glowing
+    // mushrooms and a little wooden signpost. More life, more charm.
+    // ═══════════════════════════════════════════════════════════════════
+    const woodMat = new T.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.9, flatShading: true });
+    const ironMat = new T.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.5 });
+    // 3 glowing lantern posts following the cottage path
+    [[-7.6, 3.9], [-5.6, 5.2], [-3.4, 6.6]].forEach(([px, pz]) => {
+      const post = new T.Mesh(new T.CylinderGeometry(0.09, 0.13, 3.0, 6), woodMat);
+      post.position.set(px, 11.6, pz);
+      post.castShadow = true;
+      station0Group.add(post);
+      const arm = new T.Mesh(new T.BoxGeometry(0.7, 0.1, 0.1), woodMat);
+      arm.position.set(px + 0.3, 13.05, pz);
+      station0Group.add(arm);
+      const lamp = new T.Mesh(new T.BoxGeometry(0.34, 0.42, 0.34), ironMat);
+      lamp.position.set(px + 0.62, 12.78, pz);
+      station0Group.add(lamp);
+      const flame = new T.Mesh(new T.SphereGeometry(0.15, 8, 7),
+        new T.MeshStandardMaterial({ color: 0xfde68a, emissive: 0xfbbf24, emissiveIntensity: 2.6, roughness: 0.3 }));
+      flame.position.set(px + 0.62, 12.76, pz);
+      station0Group.add(flame);
+      const glow = new T.PointLight(0xffc98a, 1.1, 9, 1.8);
+      glow.position.set(px + 0.62, 12.7, pz);
+      station0Group.add(glow);
+    });
+    // wooden bench facing the pond
+    const benchSeat = new T.Mesh(new T.BoxGeometry(2.4, 0.16, 0.7), woodMat);
+    benchSeat.position.set(-2.0, 11.35, 9.6); benchSeat.castShadow = true;
+    station0Group.add(benchSeat);
+    const benchBack = new T.Mesh(new T.BoxGeometry(2.4, 0.62, 0.12), woodMat);
+    benchBack.position.set(-2.0, 11.72, 9.95); benchBack.rotation.x = -0.12;
+    station0Group.add(benchBack);
+    [[-3.0, 9.6], [-1.0, 9.6]].forEach(([bx, bz]) => {
+      const leg = new T.Mesh(new T.BoxGeometry(0.14, 0.7, 0.6), ironMat);
+      leg.position.set(bx, 11.02, bz);
+      station0Group.add(leg);
+    });
+    // wildflower meadow + glowing mushrooms near the pond's edge
+    const meadow = createFlowerPatch(3.6, 26);
+    meadow.position.set(5.6, 10.75, -6.0);
+    station0Group.add(meadow);
+    const pondMush = createGlowingMushroomCluster(0xf472b6, 5);
+    pondMush.position.set(7.8, 10.7, 4.6);
+    station0Group.add(pondMush);
+    // little signpost at the path fork
+    const signPost = new T.Mesh(new T.BoxGeometry(0.16, 2.2, 0.16), woodMat);
+    signPost.position.set(-6.0, 11.2, 7.4);
+    station0Group.add(signPost);
+    const signBoard = new T.Mesh(new T.BoxGeometry(1.35, 0.55, 0.1), woodMat);
+    signBoard.position.set(-6.0, 12.15, 7.4); signBoard.rotation.y = 0.35;
+    station0Group.add(signBoard);
+
     // 3. Majestic Grand Oak — kept well CLEAR of the cottage on every side:
     //    it used to stand behind-left of the cottage, and from behind/left
     //    viewpoints (zoomed-out or orbited cameras) its canopy swallowed the
@@ -3562,6 +3710,115 @@
         window.__springRipples.push({ mesh: ring, phase: r / spot.n, speed: 0.34 });
       }
     });
+
+    /* ── THE SPRING, ENRICHED — a beautiful landmark at the water's birth ──
+       An ornate octagonal stone crown with gold inlay and eight amethyst
+       shards, a second finer jet with splash droplets, drifting lily pads
+       with pink blossoms, reed clusters, an arched stone footbridge over
+       the stream, and rising sparkle motes. Elegant, creative, alive. */
+    const springStoneMat = new T.MeshStandardMaterial({ color: 0xb8c4d4, roughness: 0.8, flatShading: true });
+    applyGhibliToon(springStoneMat, { shadowTint: new T.Color(0x475569), rimColor: new T.Color(0xffffff) });
+    const springGoldMat = new T.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.8, roughness: 0.22 });
+    const springCrystalMat = new T.MeshStandardMaterial({
+      color: 0xa5b4fc, emissive: 0x6366f1, emissiveIntensity: 1.6, roughness: 0.12, metalness: 0.25,
+    });
+
+    // ornate crown: octagonal outer wall + inner lip + gold ring
+    const crownOuter = new T.Mesh(new T.CylinderGeometry(2.55, 2.8, 1.15, 8), springStoneMat);
+    crownOuter.position.set(0.5, waterSurfaceY + 0.45, -6.2);
+    crownOuter.castShadow = true; crownOuter.receiveShadow = true;
+    station0Group.add(crownOuter);
+    const crownInner = new T.Mesh(new T.CylinderGeometry(1.95, 1.95, 0.6, 8),
+      new T.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.4 }));
+    crownInner.position.set(0.5, waterSurfaceY + 1.05, -6.2);
+    station0Group.add(crownInner);
+    const crownGold = new T.Mesh(new T.TorusGeometry(2.58, 0.1, 6, 8), springGoldMat);
+    crownGold.rotation.x = Math.PI / 2;
+    crownGold.position.set(0.5, waterSurfaceY + 1.0, -6.2);
+    station0Group.add(crownGold);
+    // eight amethyst shards around the crown
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      const shard = new T.Mesh(new T.OctahedronGeometry(0.34, 0), springCrystalMat);
+      shard.position.set(0.5 + Math.cos(a) * 2.45, waterSurfaceY + 1.35, -6.2 + Math.sin(a) * 2.45);
+      shard.scale.set(0.7, 1.7, 0.7);
+      shard.rotation.y = a;
+      station0Group.add(shard);
+    }
+    // a glowing spirit orb hovering above the crown — the island's landmark
+    const spiritOrb = new T.Mesh(
+      new T.IcosahedronGeometry(0.55, 1),
+      new T.MeshStandardMaterial({ color: 0xbfdbfe, emissive: 0x38bdf8, emissiveIntensity: 2.2, roughness: 0.1, transparent: true, opacity: 0.92 })
+    );
+    spiritOrb.position.set(0.5, waterSurfaceY + 3.4, -6.2);
+    spiritOrb.userData.baseY = waterSurfaceY + 3.4;
+    station0Group.add(spiritOrb);
+    const orbHalo = new T.Mesh(new T.TorusGeometry(0.95, 0.05, 5, 20),
+      new T.MeshStandardMaterial({ color: 0xa5f3fc, emissive: 0x22d3ee, emissiveIntensity: 1.8 }));
+    orbHalo.position.copy(spiritOrb.position);
+    orbHalo.rotation.x = Math.PI * 0.35;
+    station0Group.add(orbHalo);
+    window.__springOrb = { orb: spiritOrb, halo: orbHalo };
+
+    // fine secondary jet with droplets
+    const jet2Curve = new T.QuadraticBezierCurve3(
+      new T.Vector3(0.5, waterSurfaceY + 1.0, -6.2),
+      new T.Vector3(1.3, 14.4, -4.0),
+      new T.Vector3(0.9, waterSurfaceY + 0.5, -2.2)
+    );
+    station0Group.add(new T.Mesh(new T.TubeGeometry(jet2Curve, 18, 0.16, 6, false), waterfallMat));
+    const dropMat = new T.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.8 });
+    window.__springDrops = [];
+    for (let i = 0; i < 10; i++) {
+      const drop = new T.Mesh(new T.SphereGeometry(0.075, 5, 4), dropMat);
+      drop.position.set(0.5 + (Math.random() - 0.5) * 1.6, waterSurfaceY + 1.3, -6.2 + (Math.random() - 0.5) * 1.6);
+      drop.userData.seed = Math.random() * 6.28;
+      drop.userData.baseY = waterSurfaceY + 1.3;
+      station0Group.add(drop);
+      window.__springDrops.push(drop);
+    }
+    // lily pads with pink blossoms drifting on the lake
+    [[2.6, -1.6], [-1.9, 1.2], [3.4, 3.0], [-3.1, -3.4], [1.0, 6.4]].forEach(([lx, lz], i) => {
+      const pad = new T.Mesh(new T.CylinderGeometry(0.62, 0.62, 0.06, 9),
+        new T.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.7, flatShading: true }));
+      pad.position.set(lx, waterSurfaceY + 0.06, lz);
+      pad.rotation.y = i * 1.1;
+      station0Group.add(pad);
+      if (i % 2 === 0) {
+        const blossom = new T.Mesh(new T.ConeGeometry(0.26, 0.3, 6),
+          new T.MeshStandardMaterial({ color: 0xf9a8d4, emissive: 0xec4899, emissiveIntensity: 0.5, roughness: 0.5, flatShading: true }));
+        blossom.position.set(lx, waterSurfaceY + 0.24, lz);
+        station0Group.add(blossom);
+      }
+    });
+    // reed clusters at the water's edge
+    [[-4.4, -4.6], [4.9, 1.0], [-4.9, 3.4]].forEach(([rx, rz]) => {
+      for (let r = 0; r < 5; r++) {
+        const reed = new T.Mesh(new T.CylinderGeometry(0.035, 0.055, 1.5 + Math.random() * 0.8, 4),
+          new T.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.85 }));
+        reed.position.set(rx + (Math.random() - 0.5) * 0.7, waterSurfaceY + 0.8, rz + (Math.random() - 0.5) * 0.7);
+        reed.rotation.z = (Math.random() - 0.5) * 0.22;
+        station0Group.add(reed);
+      }
+    });
+    // arched stone footbridge over the stream
+    const bridgeMat = new T.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.9, flatShading: true });
+    applyGhibliToon(bridgeMat, { shadowTint: new T.Color(0x475569), rimColor: new T.Color(0xffffff) });
+    const bridgeArc = new T.Mesh(new T.TorusGeometry(3.1, 0.32, 6, 14, Math.PI), bridgeMat);
+    bridgeArc.rotation.z = Math.PI;
+    bridgeArc.position.set(-5.0, waterSurfaceY + 3.1, 3.0);
+    bridgeArc.castShadow = true;
+    station0Group.add(bridgeArc);
+    [-1, 1].forEach((side) => {
+      const rail = new T.Mesh(new T.TorusGeometry(3.1, 0.1, 5, 14, Math.PI), springGoldMat);
+      rail.rotation.z = Math.PI;
+      rail.position.set(-5.0, waterSurfaceY + 3.72, 3.0 + side * 0.52);
+      station0Group.add(rail);
+    });
+    // soft cool glow so the source reads as magical
+    const springGlow = new T.PointLight(0x7dd3fc, 1.6, 16, 1.8);
+    springGlow.position.set(0.5, waterSurfaceY + 1.6, -6.2);
+    station0Group.add(springGlow);
 
     // Waterfall Plunge Spray & Mist Particle System
     const mistCount = 120;
@@ -3876,7 +4133,7 @@
           pose: "sit", shirtColor: 0x06b6d4, pantsColor: 0x1e1b4b,
           hairColor: 0x451a03, hairStyle: "bob", scale: 0.65
         });
-        child0.group.position.set(0, 1.1, 4.2);
+        child0.group.position.set(0, 2.32, 4.2);
         child0.group.rotation.y = 0;
         isleG.add(child0.group);
 
@@ -3892,7 +4149,7 @@
           hairColor: 0x1c1917, hairStyle: "pigtails", scale: 0.65,
           hasBalloon: true, balloonColor: 0xf43f5e
         });
-        child1.group.position.set(2.4, 1.1, -1.2);
+        child1.group.position.set(2.4, 2.32, -1.2);
         child1.group.rotation.y = -0.8;
         isleG.add(child1.group);
 
@@ -3920,7 +4177,7 @@
           pose: "wave", shirtColor: 0xf59e0b, pantsColor: 0x06b6d4,
           hairColor: 0x78350f, hairStyle: "spiky", scale: 0.65
         });
-        child2.group.position.set(-2.2, 1.1, -1.8);
+        child2.group.position.set(-2.2, 2.32, -1.8);
         child2.group.rotation.y = 0.4;
         isleG.add(child2.group);
 
@@ -3935,7 +4192,7 @@
           pose: "sit", shirtColor: 0x10b981, pantsColor: 0xfacc15,
           hairColor: 0x0c0a09, hairStyle: "bob", scale: 0.65
         });
-        child3.group.position.set(-1.0, 1.1, 1.2);
+        child3.group.position.set(-1.0, 2.32, 1.2);
         child3.group.rotation.y = 0.2;
         isleG.add(child3.group);
 
@@ -3963,7 +4220,7 @@
           hairColor: 0xb91c1c, hairStyle: "spiky", scale: 0.65,
           hasBalloon: true, balloonColor: 0x38bdf8
         });
-        child4.group.position.set(1.2, 1.1, -1.0);
+        child4.group.position.set(1.2, 2.32, -1.0);
         child4.group.rotation.y = -0.5;
         isleG.add(child4.group);
 
@@ -3979,7 +4236,7 @@
           hairColor: 0x451a03, hairStyle: "bob", scale: 0.65,
           hasBalloon: true, balloonColor: 0x10b981
         });
-        child5.group.position.set(-1.2, 1.1, 0);
+        child5.group.position.set(-1.2, 2.32, 0);
         child5.group.rotation.y = 0.6;
         isleG.add(child5.group);
 
@@ -4015,13 +4272,54 @@
 
     // ── GRAND COLOURFUL FOUNTAIN — the archipelago's joyful centrepiece ──
     const archipelagoFountain = createColorfulFountain(1.55);
-    archipelagoFountain.position.set(-0.4, 1.05, 2.6);
+    archipelagoFountain.position.set(-1.3, 2.32, 6.4); // well clear of the windmill
     millIsleG.add(archipelagoFountain);
     if (!window.__fountainSpinners) window.__fountainSpinners = [];
     window.__fountainSpinners.push(archipelagoFountain);
 
+    // ── A LITTLE CROWD OF HAPPY, COLOURFUL CHILDREN ─────────────────────
+    // (sitting on the grass plateau — local y 2.32 — never sinking in)
+    window.__happyKids = [];
+    const kidSpecs = [
+      { pose: "play",  shirt: 0xf43f5e, pants: 0x1d4ed8, hair: 0x78350f, style: "pigtails", x: -3.4, z: 4.4, ry: 0.9,  balloon: 0x22d3ee },
+      { pose: "cheer", shirt: 0xfbbf24, pants: 0x0ea5e9, hair: 0x451a03, style: "spiky",    x:  1.7, z: 5.3, ry: -0.6, balloon: 0xec4899 },
+      { pose: "jump",  shirt: 0x22d3ee, pants: 0x7c3aed, hair: 0x1e293b, style: "bob",      x:  3.0, z: 3.2, ry: -1.2, balloon: null },
+      { pose: "wave",  shirt: 0x10b981, pants: 0xf97316, hair: 0xb45309, style: "pigtails", x: -4.7, z: 1.9, ry: 0.5,  balloon: null },
+      { pose: "sit",   shirt: 0xa855f7, pants: 0x0f766e, hair: 0x7c2d12, style: "bob",      x:  0.6, z: 1.1, ry: 2.2,  balloon: null },
+      { pose: "play",  shirt: 0x0ea5e9, pants: 0xf43f5e, hair: 0x451a03, style: "spiky",    x: -2.2, z: 8.0, ry: 2.6,  balloon: 0xa3e635 },
+    ];
+    kidSpecs.forEach((k) => {
+      const kid = createAnimeChild({
+        pose: k.pose, shirtColor: k.shirt, pantsColor: k.pants,
+        hairColor: k.hair, hairStyle: k.style, scale: 0.62,
+        hasBalloon: !!k.balloon, balloonColor: k.balloon || 0xef4444,
+      });
+      kid.group.position.set(k.x, 2.32, k.z);
+      kid.group.rotation.y = k.ry;
+      millIsleG.add(kid.group);
+      if (k.pose === "wave" || k.pose === "cheer") {
+        window.__happyKids.push({ armR: kid.armR, phase: Math.random() * 6.28 });
+      }
+    });
+
+    // Two island-0 children: one on the bench, one skipping on the path
+    const benchKid = createAnimeChild({
+      pose: "sit", shirtColor: 0xfacc15, pantsColor: 0x2563eb,
+      hairColor: 0x451a03, hairStyle: "bob", scale: 0.6,
+    });
+    benchKid.group.position.set(-2.0, 11.45, 9.5);
+    benchKid.group.rotation.y = Math.PI;
+    station0Group.add(benchKid.group);
+    const pathKid = createAnimeChild({
+      pose: "play", shirtColor: 0xf472b6, pantsColor: 0x4f46e5,
+      hairColor: 0x1e293b, hairStyle: "pigtails", scale: 0.6,
+    });
+    pathKid.group.position.set(-5.4, 10.78, 5.0);
+    pathKid.group.rotation.y = -1.1;
+    station0Group.add(pathKid.group);
+
     attachModelSlot("windmill", millIsleG, 13.0, false, (mill) => {
-      mill.position.set(-1.5, 1.25, -2.5);
+      mill.position.set(-1.5, 2.32, -2.5);
       mill.rotation.set(0, -0.42, 0);
       // Find the Mill_Blades node so we can spin it around the HORIZONTAL shaft
       mill.traverse((ch) => {
@@ -4034,7 +4332,7 @@
 
     // Wooden dock reaching toward the viewer, far end overhanging the rim
     attachModelSlot("dock", millIsleG, 4.2, false, (dock) => {
-      dock.position.set(3.2, 0.95, 12.4);
+      dock.position.set(3.2, 2.26, 12.4);
       dock.rotation.set(0, 0.35, 0);
     });
 
@@ -4057,7 +4355,7 @@
       const cap = new T.Mesh(new T.ConeGeometry(0.42, 0.38, 6), capMat);
       cap.position.y = h + 0.75;
       post.add(cap);
-      post.position.set(x, 1.15, z);
+      post.position.set(x, 2.32, z);
       return post;
     }
     millIsleG.add(makeLanternPost(-1.0, 9.0));
@@ -4072,12 +4370,12 @@
 
     // Miller's garden — flowers, mushrooms & two bunnies by the door
     const millFlowers = createFlowerPatch(3.6, 16);
-    millFlowers.position.set(3.4, 1.1, 1.5);
+    millFlowers.position.set(3.4, 2.32, 1.5);
     millIsleG.add(millFlowers);
     const millMush = createGlowingMushroomCluster(0xfbbf24, 4);
-    millMush.position.set(-4.6, 1.1, 2.2);
+    millMush.position.set(-4.6, 2.32, 2.2);
     millIsleG.add(millMush);
-    [[-4.2, 1.1, 4.6], [4.8, 1.1, 4.2]].forEach((p, i) => {
+    [[-4.2, 2.32, 4.6], [4.8, 2.32, 4.2]].forEach((p, i) => {
       const mb = createPlayfulBunny(i === 0 ? 0xffffff : 0xfef3c7);
       mb.position.set(...p);
       mb.rotation.y = Math.random() * Math.PI * 2;
@@ -5041,19 +5339,19 @@
   // to drift them to (the wheel no longer zooms while scrolling the story).
   // The visitor's own choice is remembered in localStorage, so the realm
   // always reopens exactly how they like to travel.
-  const ZOOM_DEFAULT = 1.25;
+  const ZOOM_DEFAULT = 1.02; // HUD reads 98%
   const ZOOM_MIN = 0.35;
   const ZOOM_MAX = 3.0;
   const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
   let savedZoom = 0;
-  try { savedZoom = Number(localStorage.getItem("isles-zoom")) || 0; } catch {}
+  try { savedZoom = Number(localStorage.getItem("isles-zoom-v2")) || 0; } catch {}
   let zoomFactor = savedZoom ? clampZoom(savedZoom) : ZOOM_DEFAULT;
   let targetZoomFactor = zoomFactor;
   let lastSavedZoom = zoomFactor;
   const rememberZoom = () => {
     if (Math.abs(targetZoomFactor - lastSavedZoom) < 0.005) return;
     lastSavedZoom = targetZoomFactor;
-    try { localStorage.setItem("isles-zoom", String(targetZoomFactor)); } catch {}
+    try { localStorage.setItem("isles-zoom-v2", String(targetZoomFactor)); } catch {}
   };
 
   // Raycaster for 3D Island Beacons and Click Targets
@@ -5385,6 +5683,42 @@
           jet.scale.y = 0.85 + Math.sin(elapsedTime * 4 + i * 0.8) * 0.22;
         });
         s.petals.rotation.y += 0.0028;
+      });
+    }
+
+    // Spirit orb hovering over the spring
+    if (window.__springOrb) {
+      const o = window.__springOrb;
+      o.orb.rotation.y += 0.01;
+      o.orb.position.y = o.orb.userData.baseY + Math.sin(elapsedTime * 1.5) * 0.22;
+      o.halo.rotation.z += 0.013;
+      o.halo.position.y = o.orb.position.y;
+    }
+
+    // Spring droplets dance above the crown
+    if (window.__springDrops) {
+      window.__springDrops.forEach((d) => {
+        const t = (elapsedTime * 0.7 + d.userData.seed) % 1;
+        d.position.y = d.userData.baseY + Math.sin(t * Math.PI) * 1.1;
+        d.scale.setScalar(0.7 + Math.sin(t * Math.PI) * 0.5);
+      });
+    }
+
+    // Happy children wave their arms cheerfully
+    if (window.__happyKids) {
+      window.__happyKids.forEach((k) => {
+        if (k.armR) k.armR.rotation.z = Math.PI * 0.68 + Math.sin(elapsedTime * 3.2 + k.phase) * 0.22;
+      });
+    }
+
+    // Drifting chimney smoke on the cottage below
+    if (window.__chimneySmoke) {
+      window.__chimneySmoke.forEach((p, i) => {
+        const t = ((elapsedTime * 0.16) + p.userData.seed * 0.25 + i * 0.25) % 1;
+        p.position.y = p.userData.baseY + t * 3.2;
+        p.position.x = 2.2 + Math.sin((t + i) * 5.5) * 0.35;
+        p.material.opacity = 0.42 * (1 - t);
+        p.scale.setScalar(1 + t * 1.4);
       });
     }
 
