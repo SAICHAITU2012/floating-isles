@@ -47,16 +47,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Serve the site locally
-        run: |
-          node tools/server.mjs &
-          sleep 2
-      - name: Render every station in headless Chrome and gate on errors
+      - name: Serve the site and render-QA every station (one step — background servers do not survive step boundaries)
         env:
           CI: "1"
           CHROME_START_MS: "60000"
         run: |
           set -e
+          node tools/server.mjs > /tmp/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid 2>/dev/null || true' EXIT
+          sleep 2
+          curl -sf -o /dev/null http://127.0.0.1:8099/ || { echo "::error::local server did not come up"; cat /tmp/server.log; exit 1; }
           # find a Chrome binary (runner images differ)
           CHROME_BIN=""
           for c in google-chrome google-chrome-stable chromium chromium-browser; do
