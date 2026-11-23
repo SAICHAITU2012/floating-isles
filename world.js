@@ -1683,13 +1683,15 @@
 
     // Right Arm (Posed for waving or resting)
     const waveArmPivot = new T.Group();
-    waveArmPivot.position.set(0.58, 2.35 + yOff, 0.05);
+    waveArmPivot.position.set(0.62, 2.30 + yOff, 0.05);
     const armR = new T.Mesh(armGeo, sleeveMat);
     armR.position.set(0, -0.35, 0);
 
     if (pose === "wave" || isSeated) {
       // Waved warmly
-      waveArmPivot.rotation.set(0.15, 0, -Math.PI * 0.65);
+      // +0.79*PI swings the forearm up and OUTWARD so the hand sits
+      // beside her head, never inside it.
+      waveArmPivot.rotation.set(0.18, 0, Math.PI * 0.80);
     } else {
       waveArmPivot.rotation.set(0.2, 0, -0.2);
     }
@@ -3578,10 +3580,32 @@
     });
 
     // 4. Wooden Dock & Lakeside Details
-    attachModelSlot("dock", station0Group, 2.2, false, (m) => {
-      m.position.set(4.0, 10.2, 9.5);
-      m.rotation.set(0, -0.6, 0);
+    attachModelSlot("dock", station0Group, 1.45, false, (m) => {
+      m.position.set(8.6, 10.05, 3.2);   // tucked at the pond's far edge
+      m.rotation.set(0, 1.15, 0);
     });
+
+    /* A small round terrace where the girl sits — replaces the big dock
+       that used to fill the foreground. Stone rim, plank top, short posts. */
+    {
+      const terrMat = new T.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.85, flatShading: true });
+      applyGhibliToon(terrMat, { shadowTint: new T.Color(0x57330f), rimColor: new T.Color(0xffedd5) });
+      const terrTop = new T.Mesh(new T.CylinderGeometry(2.75, 2.75, 0.22, 16), terrMat);
+      terrTop.position.set(4.0, 11.24, 9.15);
+      terrTop.receiveShadow = true;
+      station0Group.add(terrTop);
+      const terrRim = new T.Mesh(new T.TorusGeometry(2.76, 0.13, 6, 20),
+        new T.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85, flatShading: true }));
+      terrRim.rotation.x = Math.PI / 2;
+      terrRim.position.set(4.0, 11.24, 9.15);
+      station0Group.add(terrRim);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + 0.4;
+        const post = new T.Mesh(new T.CylinderGeometry(0.1, 0.12, 0.55, 6), terrMat);
+        post.position.set(4.0 + Math.cos(a) * 2.0, 10.9, 9.15 + Math.sin(a) * 2.0);
+        station0Group.add(post);
+      }
+    }
 
     // Sculpted Boulders
     attachModelSlot("rock1", station0Group, 2.8, false, (m) => {
@@ -4649,19 +4673,19 @@
       kittenColors.forEach((c, i) => {
         const k = createCat(c);
         const a = (i / 3) * Math.PI * 2;
-        k.group.position.set(6.6 + Math.cos(a) * 1.0, 11.33, 10.4 + Math.sin(a) * 0.8);
+        k.group.position.set(5.9 + Math.cos(a) * 0.9, 11.36, 9.9 + Math.sin(a) * 0.7);
         k.group.scale.setScalar(0.72);
         station0Group.add(k.group);
         catAnimData.push(k);
-        playground.kittens.push({ group: k.group, cx: 6.6, cz: 10.4, rx: 1.0, rz: 0.8, r: 1.0, a, speed: 0.5 + i * 0.1, phase: i * 2.1 });
+        playground.kittens.push({ group: k.group, cx: 5.9, cz: 9.9, rx: 0.9, rz: 0.7, r: 0.9, a, speed: 0.5 + i * 0.1, phase: i * 2.1 });
       });
       // puppy
       const puppy = createCat(0xd97706);
       puppy.group.scale.setScalar(0.9);
-      puppy.group.position.set(2.2, 11.33, 10.6);
+      puppy.group.position.set(2.6, 11.36, 10.1);
       station0Group.add(puppy.group);
       catAnimData.push(puppy);
-      playground.pets.push({ group: puppy.group, base: new T.Vector3(2.2, 11.33, 10.6), phase: 0, r: 0.5 });
+      playground.pets.push({ group: puppy.group, base: new T.Vector3(2.6, 11.36, 10.1), phase: 0, r: 0.5 });
       // bunny
       const bunnyG = new T.Group();
       const bBody = new T.Mesh(new T.SphereGeometry(0.3, 10, 8),
@@ -4680,9 +4704,9 @@
         bunnyG.add(ear);
       });
       bunnyG.scale.setScalar(0.75);
-      bunnyG.position.set(7.4, 11.33, 8.6);
+      bunnyG.position.set(6.1, 11.36, 8.2);
       station0Group.add(bunnyG);
-      playground.pets.push({ group: bunnyG, base: new T.Vector3(7.4, 11.33, 8.6), phase: 1.6, r: 0.45 });
+      playground.pets.push({ group: bunnyG, base: new T.Vector3(6.1, 11.36, 8.2), phase: 1.6, r: 0.45 });
       window.__parkPlay = playground;
     }
 
@@ -6410,7 +6434,7 @@
         k.group.position.x = k.cx + Math.cos(k.a) * k.rx;
         k.group.position.z = k.cz + Math.sin(k.a) * k.rz;
         k.group.rotation.y = -k.a + Math.PI / 2;
-        k.group.position.y = 11.33 + Math.abs(Math.sin(elapsedTime * 4 + k.phase)) * 0.16;
+        k.group.position.y = 11.36 + Math.abs(Math.sin(elapsedTime * 4 + k.phase)) * 0.16;
       });
       pk.pets.forEach((p) => {
         p.group.position.y = p.base.y + Math.abs(Math.sin(elapsedTime * 3.1 + p.phase)) * 0.26;
@@ -6685,7 +6709,9 @@
       window.__guideGirlAnimData.forEach((g, idx) => {
         // Gentle waving arm oscillation
         if (g.pose === "wave" && g.waveArmPivot) {
-          g.waveArmPivot.rotation.z = -Math.PI * 0.65 + Math.sin(elapsedTime * 2.8 + idx * 1.5) * 0.18;
+          // Wave OUTWARD (the old −0.65π swung the hand into her own head)
+          g.waveArmPivot.rotation.z = Math.PI * 0.80 + Math.sin(elapsedTime * 2.8 + idx * 1.5) * 0.14;
+          g.waveArmPivot.rotation.x = 0.16 + Math.sin(elapsedTime * 2.8 + idx * 1.5) * 0.05;
         }
         // Floating beacon diamond rotation and bob
         if (g.beaconDiamond) {
