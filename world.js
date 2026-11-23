@@ -674,6 +674,7 @@
   const _sunPos = new T.Vector3(), _sunTgt = new T.Vector3();
   const _posA = new T.Vector3(), _posB = new T.Vector3();
   const _tgtA = new T.Vector3(), _tgtB = new T.Vector3();
+  const _jcLook = new T.Vector3();
 
   function lerpColor(prop, key, t) {
     _skyA.setHex(SKY_JOURNEY[prop][key]);
@@ -833,34 +834,63 @@
   function createFerrisWheel(radius = 10.0) {
     const group = new T.Group();
     const legMat = new T.MeshStandardMaterial({ color: 0xd97706, roughness: 0.45, metalness: 0.65 });
-    const legGeo = new T.CylinderGeometry(0.28, 0.45, radius * 2.3, 8);
+    const axleY = radius * 1.95;
 
-    [-1.8, 1.8].forEach((zOffset) => {
-      const legL = new T.Mesh(legGeo, legMat);
-      legL.position.set(-radius * 0.48, radius * 0.98, zOffset);
-      legL.rotation.z = 0.26;
-      group.add(legL);
+    // Perfect A-frame supports: each apex lands exactly on the axle line,
+    // feet spread symmetrically onto stone footing pads
+    const footSpread = radius * 0.62;
+    [1.9, -1.9].forEach((zOffset) => {
+      [-1, 1].forEach((side) => {
+        const apex = new T.Vector3(0, axleY, zOffset);
+        const foot = new T.Vector3(side * footSpread, 0.45, zOffset);
+        const dir = new T.Vector3().subVectors(apex, foot);
+        const len = dir.length();
 
-      const legR = new T.Mesh(legGeo, legMat);
-      legR.position.set(radius * 0.48, radius * 0.98, zOffset);
-      legR.rotation.z = -0.26;
-      group.add(legR);
+        const leg = new T.Mesh(new T.CylinderGeometry(0.22, 0.34, len, 8), legMat);
+        leg.position.copy(foot).addScaledVector(dir, 0.5);
+        leg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.clone().normalize());
+        leg.castShadow = true;
+        group.add(leg);
 
-      const braceGeo = new T.CylinderGeometry(0.16, 0.16, radius * 0.85, 6);
-      const brace = new T.Mesh(braceGeo, legMat);
-      brace.position.set(0, radius * 0.68, zOffset);
+        // Stone footing pad under every foot
+        const pad = new T.Mesh(
+          new T.CylinderGeometry(0.85, 1.05, 0.45, 8),
+          new T.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9, flatShading: true })
+        );
+        pad.position.set(foot.x, 0.22, foot.z);
+        pad.receiveShadow = true;
+        group.add(pad);
+      });
+
+      // Horizontal cross-brace tying the A-frame at 55% height
+      const braceY = 0.45 + (axleY - 0.45) * 0.55;
+      const halfWidthAt = footSpread * (1 - (braceY - 0.45) / (axleY - 0.45));
+      const brace = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, halfWidthAt * 2, 8), legMat);
+      brace.position.set(0, braceY, zOffset);
       brace.rotation.z = Math.PI / 2;
+      brace.castShadow = true;
       group.add(brace);
     });
 
+    // Depth brace connecting the two A-frames along z at 30% height
+    const depthBraceY = 0.45 + (axleY - 0.45) * 0.3;
+    const depthHalf = footSpread * (1 - (depthBraceY - 0.45) / (axleY - 0.45));
+    const depthBrace = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 3.8, 8), legMat);
+    depthBrace.position.set(depthHalf, depthBraceY, 0);
+    depthBrace.rotation.x = Math.PI / 2;
+    group.add(depthBrace);
+    const depthBrace2 = depthBrace.clone();
+    depthBrace2.position.x = -depthHalf;
+    group.add(depthBrace2);
+
     const axleGeo = new T.CylinderGeometry(0.42, 0.42, 4.4, 12);
     const axle = new T.Mesh(axleGeo, legMat);
-    axle.position.set(0, radius * 1.95, 0);
+    axle.position.set(0, axleY, 0);
     axle.rotation.x = Math.PI / 2;
     group.add(axle);
 
     const wheelGroup = new T.Group();
-    wheelGroup.position.set(0, radius * 1.95, 0);
+    wheelGroup.position.set(0, axleY, 0);
     group.add(wheelGroup);
 
     const rimMat = new T.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.7 });
@@ -1116,120 +1146,142 @@
    * Sleek sculpted anime/Ghibli body, luminous pearlescent markings,
    * gossamer butterfly pectoral fins that flutter like silk, and a flowing double ribbon tail.
    */
-  function createSkyFish(color = 0x38bdf8, scale = 1.0) {
+  /**
+   * Celestial Sky-Koi — an elegant flowing dragon-carp.
+   * Lathe-profiled silk body, pearl belly, long ribbon fins & forked veil
+   * tail in two complementary colours, gold barbels, ruby eyes.
+   * Interface kept: { mesh, finL, finR, tailGroup } for the swim loop.
+   */
+  function createSkyFish(color = 0x38bdf8, scale = 1.0, finColor = 0xf472b6) {
     const fishGroup = new T.Group();
     fishGroup.scale.set(scale, scale, scale);
 
-    // 1. Organic Streamlined Koi Torso
-    const bodyGeo = new T.SphereGeometry(1.0, 20, 14);
-    bodyGeo.scale(0.68, 0.85, 3.2); // graceful elongated aquatic curve
-    const fishMat = new T.MeshStandardMaterial({
+    const bodyMat = new T.MeshStandardMaterial({
       color: color,
       emissive: color,
-      emissiveIntensity: 0.95,
-      roughness: 0.25,
-      metalness: 0.35,
+      emissiveIntensity: 0.5,
+      roughness: 0.22,
+      metalness: 0.55,
     });
-    applyGhibliToon(fishMat, { shadowTint: new T.Color(0x0f172a), rimColor: new T.Color(0xfffbeb) });
-    const body = new T.Mesh(bodyGeo, fishMat);
-    body.position.z = 0;
+    applyGhibliToon(bodyMat, { shadowTint: new T.Color(0x0f172a), rimColor: new T.Color(0xfffbeb) });
+
+    const silkMat = new T.MeshStandardMaterial({
+      color: finColor,
+      emissive: finColor,
+      emissiveIntensity: 1.05,
+      transparent: true,
+      opacity: 0.78,
+      side: T.DoubleSide,
+      roughness: 0.15,
+      metalness: 0.1,
+    });
+
+    // 1. Silk koi body — lathe profile: rounded head, full shoulders,
+    //    long taper to the tail (no more blob-sphere)
+    const profile = [
+      [0.0, -3.6], [0.30, -3.1], [0.52, -2.3], [0.66, -1.3],
+      [0.72, -0.2], [0.70, 0.9], [0.60, 1.9], [0.46, 2.6],
+      [0.30, 3.0], [0.12, 3.2], [0.0, 3.22],
+    ].map(([r, y]) => new T.Vector2(r, y));
+    const bodyGeo = new T.LatheGeometry(profile, 22);
+    bodyGeo.rotateX(Math.PI / 2); // head toward +Z
+    const body = new T.Mesh(bodyGeo, bodyMat);
     fishGroup.add(body);
 
-    // Cute Snout & Tapered Head
-    const snoutGeo = new T.ConeGeometry(0.58, 1.2, 14);
-    snoutGeo.rotateX(Math.PI / 2);
-    const snout = new T.Mesh(snoutGeo, fishMat);
-    snout.position.z = 2.8;
-    fishGroup.add(snout);
+    // Pearl belly sheen — a slimmer underlay lathe in moonlight ivory
+    const bellyProfile = profile.map((p) => new T.Vector2(p.x * 0.86, p.y));
+    const bellyGeo = new T.LatheGeometry(bellyProfile, 18);
+    bellyGeo.rotateX(Math.PI / 2);
+    const bellyMat = new T.MeshStandardMaterial({
+      color: 0xf8fafc, emissive: 0xe0f2fe, emissiveIntensity: 0.35,
+      roughness: 0.3, metalness: 0.2, transparent: true, opacity: 0.55,
+    });
+    const belly = new T.Mesh(bellyGeo, bellyMat);
+    belly.position.y = -0.14;
+    belly.scale.set(1, 0.8, 1);
+    fishGroup.add(belly);
 
-    // Glowing Expressive Anime Eyes
-    const eyeMat = new T.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.2 });
-    const pupilMat = new T.MeshBasicMaterial({ color: 0x0f172a });
-    [-0.52, 0.52].forEach((ex) => {
-      const eye = new T.Mesh(new T.SphereGeometry(0.18, 10, 10), eyeMat);
-      eye.position.set(ex, 0.35, 2.3);
-      const pup = new T.Mesh(new T.SphereGeometry(0.09, 8, 8), pupilMat);
-      pup.position.set(ex > 0 ? 0.08 : -0.08, 0, 0.12);
+    // 2. Ruby anime eyes with dark pupil
+    const eyeMat = new T.MeshStandardMaterial({ color: 0xfff1f2, emissive: 0xfda4af, emissiveIntensity: 1.6 });
+    const pupilMat = new T.MeshBasicMaterial({ color: 0x1e1b4b });
+    [-0.42, 0.42].forEach((ex) => {
+      const eye = new T.Mesh(new T.SphereGeometry(0.16, 10, 10), eyeMat);
+      eye.position.set(ex, 0.3, 2.55);
+      const pup = new T.Mesh(new T.SphereGeometry(0.08, 8, 8), pupilMat);
+      pup.position.set(ex > 0 ? 0.07 : -0.07, 0, 0.11);
       eye.add(pup);
       fishGroup.add(eye);
     });
 
-    // Whiskers / Barbels (Mythical Sky Dragon Koi)
-    const whiskerMat = new T.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfde047, emissiveIntensity: 1.5 });
+    // 3. Fine curled gold barbels (dragon-koi whiskers)
+    const whiskerMat = new T.MeshStandardMaterial({
+      color: 0xfde68a, emissive: 0xf59e0b, emissiveIntensity: 1.2, metalness: 0.6, roughness: 0.3,
+    });
     [-1, 1].forEach((side) => {
-      const wh = new T.Mesh(new T.CylinderGeometry(0.02, 0.04, 1.8, 6), whiskerMat);
-      wh.position.set(side * 0.45, -0.2, 3.2);
-      wh.rotation.set(0.6, 0, side * -0.6);
+      const wh = new T.Mesh(new T.CylinderGeometry(0.015, 0.035, 1.6, 6), whiskerMat);
+      wh.position.set(side * 0.34, -0.28, 2.9);
+      wh.rotation.set(-0.25, 0, side * -0.5);
       fishGroup.add(wh);
     });
 
-    // Translucent Gossamer Butterfly Pectoral Fins
-    const finMat = new T.MeshStandardMaterial({
-      color: color,
-      emissive: color,
-      emissiveIntensity: 1.4,
-      transparent: true,
-      opacity: 0.82,
-      side: T.DoubleSide,
-      roughness: 0.15,
-    });
-
+    // 4. Long ribbon pectoral fins — sweeping silk wings
     const finL = new T.Group();
-    finL.position.set(-0.65, -0.1, 0.8);
+    finL.position.set(-0.55, -0.15, 1.1);
     const finR = new T.Group();
-    finR.position.set(0.65, -0.1, 0.8);
+    finR.position.set(0.55, -0.15, 1.1);
 
-    const wingShape = new T.Shape();
-    wingShape.moveTo(0, 0);
-    wingShape.bezierCurveTo(1.2, 0.8, 2.4, 0.4, 3.2, -0.8);
-    wingShape.bezierCurveTo(2.2, -1.2, 1.2, -0.8, 0, -0.2);
-    wingShape.closePath();
-    const wingGeo = new T.ShapeGeometry(wingShape);
+    const finShape = new T.Shape();
+    finShape.moveTo(0, 0);
+    finShape.bezierCurveTo(1.6, 0.9, 3.4, 0.5, 4.6, -1.4);
+    finShape.bezierCurveTo(3.0, -1.5, 1.4, -0.9, 0, -0.25);
+    finShape.closePath();
+    const finGeo = new T.ShapeGeometry(finShape);
 
-    const wingMeshL = new T.Mesh(wingGeo, finMat);
-    wingMeshL.rotation.set(-Math.PI / 2.2, -0.3, -Math.PI / 2);
-    wingMeshL.scale.set(0.9, 0.9, 0.9);
-    finL.add(wingMeshL);
+    const finMeshL = new T.Mesh(finGeo, silkMat);
+    finMeshL.rotation.set(-Math.PI / 2.1, -0.25, -Math.PI / 2);
+    finMeshL.scale.set(0.85, 0.85, 0.85);
+    finL.add(finMeshL);
 
-    const wingMeshR = new T.Mesh(wingGeo, finMat);
-    wingMeshR.rotation.set(-Math.PI / 2.2, 0.3, Math.PI / 2);
-    wingMeshR.scale.set(-0.9, 0.9, 0.9);
-    finR.add(wingMeshR);
+    const finMeshR = new T.Mesh(finGeo, silkMat);
+    finMeshR.rotation.set(-Math.PI / 2.1, 0.25, Math.PI / 2);
+    finMeshR.scale.set(-0.85, 0.85, 0.85);
+    finR.add(finMeshR);
 
     fishGroup.add(finL);
     fishGroup.add(finR);
 
-    // Arched Dorsal Crest Fin
+    // 5. Crest dorsal ridge — a tall sail along the spine
     const dorsalShape = new T.Shape();
     dorsalShape.moveTo(0, 0);
-    dorsalShape.bezierCurveTo(0, 1.2, -1.5, 1.5, -2.8, 0);
+    dorsalShape.bezierCurveTo(0.2, 1.4, -1.2, 2.2, -3.2, 0.4);
+    dorsalShape.bezierCurveTo(-1.8, 0.5, -0.8, 0.3, 0, 0);
     dorsalShape.closePath();
     const dorsalGeo = new T.ShapeGeometry(dorsalShape);
-    const dorsal = new T.Mesh(dorsalGeo, finMat);
+    const dorsal = new T.Mesh(dorsalGeo, silkMat);
     dorsal.rotation.y = Math.PI / 2;
-    dorsal.position.set(0, 0.75, 1.2);
+    dorsal.position.set(0, 0.62, 1.6);
     fishGroup.add(dorsal);
 
-    // Flowing Silk Ribbon Tail (Betta Ribbon Koi)
+    // 6. Veil tail — two crossed silk ribbons, long and sweeping
     const tailGroup = new T.Group();
-    tailGroup.position.set(0, 0, -3.2);
+    tailGroup.position.set(0, 0, -3.5);
 
     const tailShape = new T.Shape();
     tailShape.moveTo(0, 0);
-    tailShape.bezierCurveTo(0.6, 1.5, 0.8, 3.0, 0, 4.2);
-    tailShape.bezierCurveTo(-0.6, 3.0, -0.6, 1.5, 0, 0);
+    tailShape.bezierCurveTo(0.9, 1.8, 1.1, 3.6, 0, 5.4);
+    tailShape.bezierCurveTo(-0.9, 3.6, -0.7, 1.8, 0, 0);
     tailShape.closePath();
     const tailGeo = new T.ShapeGeometry(tailShape);
 
-    const tailMain = new T.Mesh(tailGeo, finMat);
+    const tailMain = new T.Mesh(tailGeo, silkMat);
     tailMain.rotation.x = Math.PI / 2;
-    tailMain.scale.set(1.2, 1.4, 1.0);
+    tailMain.scale.set(1.25, 1.5, 1.0);
     tailGroup.add(tailMain);
 
-    const tailSub = new T.Mesh(tailGeo, finMat);
+    const tailSub = new T.Mesh(tailGeo, silkMat);
     tailSub.rotation.x = Math.PI / 2;
     tailSub.rotation.z = Math.PI / 2;
-    tailSub.scale.set(0.8, 1.2, 1.0);
+    tailSub.scale.set(0.75, 1.25, 1.0);
     tailGroup.add(tailSub);
 
     fishGroup.add(tailGroup);
@@ -3091,6 +3143,58 @@
     station0Group.add(waterfallMesh);
     animatedMaterials.push(waterfallMat);
 
+    /* ── THE SPRING — visible source of all this water ────────────────
+       A stone spring head bubbles at the lake's far edge, an arc of water
+       leaps in, a shallow stream carries it across the lake to the falls
+       lip, and ripple rings mark both ends. Spring → lake → waterfall.
+       (Placed after waterfallMat exists — the jet & stream share its skin.) */
+    const springRing = new T.Mesh(
+      new T.TorusGeometry(1.5, 0.32, 8, 20),
+      new T.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9, flatShading: true })
+    );
+    springRing.rotation.x = -Math.PI / 2;
+    springRing.position.set(0.5, 10.45, -6.2);
+    springRing.castShadow = true;
+    springRing.receiveShadow = true;
+    station0Group.add(springRing);
+
+    // The jet: a slim ribbon of water arcing out of the spring into the lake
+    const springJetCurve = new T.QuadraticBezierCurve3(
+      new T.Vector3(0.5, 11.0, -6.2),
+      new T.Vector3(2.6, 13.6, -2.6),
+      new T.Vector3(1.6, 10.7, 0.8)
+    );
+    const springJet = new T.Mesh(new T.TubeGeometry(springJetCurve, 20, 0.4, 8, false), waterfallMat);
+    station0Group.add(springJet);
+
+    // Shallow stream crossing the lake: spring → falls lip (same flowing skin)
+    const streamCurve = new T.CatmullRomCurve3([
+      new T.Vector3(0.8, 10.5, -5.4),
+      new T.Vector3(0.2, 10.48, -1.0),
+      new T.Vector3(-0.2, 10.46, 6.0),
+      new T.Vector3(0.0, 10.44, 13.6),
+    ]);
+    const stream = new T.Mesh(new T.TubeGeometry(streamCurve, 24, 0.85, 8, false), waterfallMat);
+    station0Group.add(stream);
+
+    // Expanding ripple rings at both ends of the story
+    window.__springRipples = [];
+    const rippleMat = () => new T.MeshBasicMaterial({
+      color: 0xe0f2fe, transparent: true, opacity: 0.5, depthWrite: false,
+    });
+    [
+      { x: 0.5, z: -6.2, n: 3 },   // at the spring head
+      { x: 0.0, z: 14.2, n: 2 },   // at the falls lip
+    ].forEach((spot) => {
+      for (let r = 0; r < spot.n; r++) {
+        const ring = new T.Mesh(new T.TorusGeometry(1, 0.07, 6, 28), rippleMat());
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(spot.x, 10.52, spot.z);
+        station0Group.add(ring);
+        window.__springRipples.push({ mesh: ring, phase: r / spot.n, speed: 0.34 });
+      }
+    });
+
     // Waterfall Plunge Spray & Mist Particle System
     const mistCount = 120;
     const mistGeo = new T.BufferGeometry();
@@ -3277,9 +3381,10 @@
     interactiveBeacons.push(b1);
     clickTargets.push({ mesh: b1.gem, stationIdx: 1, name: "Celestial Carnival", type: "isle" });
 
-    // Orbiting Brass Armillary Rings
+    // Orbiting Brass Armillary Rings — the observatory's great instrument,
+    // crowned above the spire (clear of the ferris wheel's sweep)
     const armillaryGroup = new T.Group();
-    armillaryGroup.position.set(0, 28, 0);
+    armillaryGroup.position.set(-1.5, 21.5, 1.5);
     station1Group.add(armillaryGroup);
     rotatingElements.push({ obj: armillaryGroup, speedX: 0.015, speedY: 0.025 });
 
@@ -3291,11 +3396,16 @@
       emissiveIntensity: 0.35,
     });
     for (let r = 0; r < 3; r++) {
-      const ringGeo = new T.TorusGeometry(5.0 + r * 1.8, 0.22, 8, 32);
+      const ringGeo = new T.TorusGeometry(3.2 + r * 1.2, 0.18, 8, 32);
       const ringMesh = new T.Mesh(ringGeo, ringMat);
       ringMesh.rotation.set(r * 0.75, r * 1.1, 0);
       armillaryGroup.add(ringMesh);
     }
+    const armillaryCore = new T.Mesh(
+      new T.OctahedronGeometry(0.9, 0),
+      new T.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 2.0, roughness: 0.2 })
+    );
+    armillaryGroup.add(armillaryCore);
 
     /* ═══════════════════════════════════════════════════════════════════
        STATION 2: 02 — ARCHIPELAGO (Floating Isles & Suspension Bridges)
@@ -3917,21 +4027,21 @@
 
     // 6 Magnificent Swimming Celestial Sky-Koi Fish ("fishes in the air")
     const fishConfigs = [
-      // Hero Realm
-      { color: 0x38bdf8, cx: 20, cz: -30, baseY: 30, rx: 70, rz: 60, speed: 0.0012, offset: 0, scale: 1.4 },
-      // Carnival Realm
-      { color: 0xf59e0b, cx: 143, cz: -95, baseY: 40, rx: 60, rz: 50, speed: 0.0010, offset: 1.8, scale: 1.6 },
-      // Archipelago Realm
-      { color: 0x10b981, cx: -133, cz: -90, baseY: 32, rx: 55, rz: 46, speed: 0.0013, offset: 3.2, scale: 1.3 },
-      // Constellation Realm
-      { color: 0xec4899, cx: -68, cz: -235, baseY: 78, rx: 75, rz: 60, speed: 0.0008, offset: 4.5, scale: 1.8 },
-      // Portal Gateway
-      { color: 0x8b5cf6, cx: 9, cz: -355, baseY: 50, rx: 62, rz: 50, speed: 0.0011, offset: 2.4, scale: 1.5 },
-      // Inter-Realm Great Cosmic Voyager
-      { color: 0x06b6d4, cx: 0, cz: -175, baseY: 68, rx: 145, rz: 118, speed: 0.0006, offset: 5.1, scale: 2.0 },
+      // Hero Realm — sapphire koi, rose silk
+      { color: 0x38bdf8, fin: 0xf472b6, cx: 20, cz: -30, baseY: 30, rx: 70, rz: 60, speed: 0.0012, offset: 0, scale: 1.4 },
+      // Carnival Realm — amber koi, violet silk
+      { color: 0xf59e0b, fin: 0x8b5cf6, cx: 143, cz: -95, baseY: 40, rx: 60, rz: 50, speed: 0.0010, offset: 1.8, scale: 1.6 },
+      // Archipelago Realm — emerald koi, gold silk
+      { color: 0x10b981, fin: 0xfbbf24, cx: -133, cz: -90, baseY: 32, rx: 55, rz: 46, speed: 0.0013, offset: 3.2, scale: 1.3 },
+      // Constellation Realm — rose koi, cyan silk
+      { color: 0xec4899, fin: 0x67e8f9, cx: -68, cz: -235, baseY: 78, rx: 75, rz: 60, speed: 0.0008, offset: 4.5, scale: 1.8 },
+      // Portal Gateway — amethyst koi, silver silk
+      { color: 0x8b5cf6, fin: 0xe2e8f0, cx: 9, cz: -355, baseY: 50, rx: 62, rz: 50, speed: 0.0011, offset: 2.4, scale: 1.5 },
+      // Inter-Realm Great Cosmic Voyager — turquoise koi, coral silk
+      { color: 0x06b6d4, fin: 0xfb7185, cx: 0, cz: -175, baseY: 68, rx: 145, rz: 118, speed: 0.0006, offset: 5.1, scale: 2.0 },
     ];
     fishConfigs.forEach((cfg) => {
-      const fish = createSkyFish(cfg.color, cfg.scale);
+      const fish = createSkyFish(cfg.color, cfg.scale, cfg.fin);
       scene.add(fish.mesh);
       swimmingFish.push({
         ...fish,
@@ -4588,13 +4698,13 @@
       camera.position.lerpVectors(INTRO_FROM, camera.position, e);
     }
 
-    // Guardian salute: the crossed staffs swing fully upright as the
-    // traveller nears the gate, opening the way (and a gentle hum of light)
+    // Guardian salute: the crossed staffs swing completely upright as the
+    // traveller nears the gate — nothing bars the way
     if (portalStaffPivots) {
-      const near = Math.min(Math.max((currentStationProgress - 3.45) / 0.5, 0), 1);
+      const near = Math.min(Math.max((currentStationProgress - 3.3) / 0.6, 0), 1);
       const open = near * near * (3 - 2 * near); // smoothstep
-      portalStaffPivots.left.rotation.z = portalStaffPivots.left.userData.crossedZ * (1 - open) + (-0.05) * open;
-      portalStaffPivots.right.rotation.z = portalStaffPivots.right.userData.crossedZ * (1 - open) + (0.05) * open;
+      portalStaffPivots.left.rotation.z = portalStaffPivots.left.userData.crossedZ * (1 - open);
+      portalStaffPivots.right.rotation.z = portalStaffPivots.right.userData.crossedZ * (1 - open);
     }
 
     // Keep sky dome centered on camera so sky is infinite and seamless everywhere
@@ -4847,22 +4957,46 @@
     // Animate Joyful Jumping Child across suspension bridge (Island 1 -> Island 2)
     if (window.__jumpingChild) {
       const jc = window.__jumpingChild;
-      const cycle = (elapsedTime * 0.42) % 1.0;
-      const t = cycle;
-      // Start: Island 1 (-22, 0, -5), End: Island 2 (-4, 5, 12)
-      const x = T.MathUtils.lerp(-20, -5, t);
-      const z = T.MathUtils.lerp(-4, 11, t);
-      const baseY = T.MathUtils.lerp(1.2, 5.8, t);
-      const arc = Math.sin(t * Math.PI) * 4.2;
-      jc.group.position.set(x, baseY + arc, z);
-      jc.group.lookAt(-4, 5.8, 12);
+      // Joyful round-trip: four real hops across the Web-to-Shell ↔
+      // Automations-Agent bridge, a little pause at each end, then back.
+      const LOOP = 7.0;
+      const ct = (elapsedTime % LOOP) / LOOP;
+      const outbound = ct < 0.5;
+      const legT = outbound ? ct / 0.5 : (ct - 0.5) / 0.5;
+      // compress travel into the middle 78% of each half — rest at the isles
+      const travel = Math.min(Math.max((legT - 0.11) / 0.78, 0), 1);
+      const HOPS = 4;
+      const hp = travel * HOPS;
+      const hopIdx = Math.min(Math.floor(hp), HOPS - 1);
+      const hopPhase = hp - hopIdx;
+      const t01 = (hopIdx + hopPhase) / HOPS;
+
+      const ax = T.MathUtils.lerp(-19.4, -4.6, t01);
+      const az = T.MathUtils.lerp(-4.6, -9.4, t01);
+      // ride the plank line (lerp of isle tops minus the bridge sag)
+      const ay = T.MathUtils.lerp(1.35, 5.35, t01) - Math.sin(t01 * Math.PI) * 1.5 + 0.1;
+      const arc = Math.sin(hopPhase * Math.PI) * 1.05;
+      jc.group.position.set(ax, ay + arc, az);
+
+      // face the direction of travel
+      const aheadT = Math.min(Math.max(t01 + (outbound ? 0.08 : -0.08), 0), 1);
+      _jcLook.set(
+        T.MathUtils.lerp(-19.4, -4.6, aheadT),
+        T.MathUtils.lerp(1.35, 5.35, aheadT) - Math.sin(aheadT * Math.PI) * 1.5,
+        T.MathUtils.lerp(-4.6, -9.4, aheadT)
+      );
+      jc.group.lookAt(_jcLook);
+
+      // tuck the limbs in mid-air, bounce them on the planks
+      const air = Math.sin(hopPhase * Math.PI);
+      const groundSwing = Math.sin(elapsedTime * 10) * 0.3 * (1 - air);
       if (jc.legL && jc.legR) {
-        jc.legL.rotation.x = Math.sin(elapsedTime * 14) * 0.8;
-        jc.legR.rotation.x = -Math.sin(elapsedTime * 14) * 0.8;
+        jc.legL.rotation.x = -1.0 * air + groundSwing;
+        jc.legR.rotation.x = -0.75 * air - groundSwing;
       }
       if (jc.armL && jc.armR) {
-        jc.armL.rotation.x = Math.cos(elapsedTime * 14) * 0.7;
-        jc.armR.rotation.x = -Math.cos(elapsedTime * 14) * 0.7;
+        jc.armL.rotation.x = -2.2 * air + groundSwing * 0.6;  // arms flung up in flight
+        jc.armR.rotation.x = -2.0 * air - groundSwing * 0.6;
       }
     }
 
@@ -4875,6 +5009,16 @@
         lt.group.position.z = lt.baseZ + Math.cos(elapsedTime * 0.7 + lt.seed) * 3.5;
         lt.group.rotation.y += 0.005;
         lt.group.rotation.z = Math.sin(elapsedTime * 1.2 + lt.seed) * 0.06;
+      });
+    }
+
+    // Animate spring/lip ripple rings — expand, fade, restart
+    if (window.__springRipples) {
+      window.__springRipples.forEach((rp) => {
+        const t = (elapsedTime * rp.speed + rp.phase) % 1.0;
+        const s = 0.6 + t * 4.2;
+        rp.mesh.scale.set(s, s, 1);
+        rp.mesh.material.opacity = (1 - t) * 0.45;
       });
     }
 
