@@ -3124,12 +3124,14 @@
     station0Group.add(cottageFlowersR);
     station0Group.add(makeLanternPost(-12.9, 0.6, 2.4));
 
-    // 3. Majestic Grand Oak Tree BEHIND the cottage — pulled back-left and
-    //    trimmed so its canopy backs the roofline instead of swallowing it
-    //    (the old 12.5u crown at (-12.5,-5.5) boxed over the cottage roof
-    //    and hid it from the establishing camera).
-    attachModelSlot("treeCommon1", station0Group, 11.5, true, (m) => {
-      m.position.set(-16.2, 10.7, -8.6);
+    // 3. Majestic Grand Oak — kept well CLEAR of the cottage on every side:
+    //    it used to stand behind-left of the cottage, and from behind/left
+    //    viewpoints (zoomed-out or orbited cameras) its canopy swallowed the
+    //    whole house. It now anchors the spring side of the isle instead,
+    //    where it backs the water source without touching any sight-line
+    //    to the cottage (verified by a 36-direction raycast audit).
+    attachModelSlot("treeCommon1", station0Group, 9.5, true, (m) => {
+      m.position.set(7, 10.4, -13);
       m.rotation.set(0, 1.1, 0);
     });
 
@@ -4421,9 +4423,10 @@
       wg.add(wIsle);
 
       attachModelSlot(w.tree === "treeAutumn" ? "treeAutumn" : w.tree, wg, w.h, true, (t) => {
-        // on the neighbour isle (wi 0) the pine moves to the far flank so the
-        // cottage below owns the camera-facing side
-        t.position.set(wi === 0 ? 2.6 : 0.6, 0.95, wi === 0 ? -0.8 : 0.2);
+        // on the neighbour isle (wi 0) the pine is smaller and tucked behind
+        // the isle centre, out of every sight-line to the cottage
+        if (wi === 0) { t.position.set(-2.0, 0.95, -5.2); t.scale.multiplyScalar(0.72); }
+        else t.position.set(0.6, 0.95, 0.2);
         if (w.tree === "treeAutumn") styleAutumnTree(t, wi % 2 === 0 ? 0xf43f5e : 0xf59e0b);
       });
 
