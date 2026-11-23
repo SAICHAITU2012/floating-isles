@@ -2909,31 +2909,9 @@
               bellyWarmth: 2.0, // keep the deep belly a warm rock shelf, not a black wall
             });
           }
-          // X-RAY: hide only the rock mass — keep the 6 buried meshes visible
-          if (child.name === "pCube11_rocks1_0") child.visible = false;
         }
       });
       heroIslandSlot.add(heroIsland);
-      // X-RAY: excavate the 6 buried meshes into a display row in open air
-      // (they were buried at world ≈(-7,-4,-13), deep inside the rock, far side)
-      const BURIED = ["polySurface944_tree_body_0", "polySurface945_tree1_0", "polySurface946_tree2_0", "polySurface947_tree1_0", "polySurface948_tree_body_0", "polySurface949_tree_body_0"];
-      let xraySlot = 0;
-      const toExcavate = [];
-      heroIsland.traverse((c) => {
-        if (c.isMesh && BURIED.includes(c.name)) toExcavate.push(c);
-      });
-      toExcavate.forEach((c) => {
-        station0Group.attach(c);                       // keep world transform, re-parent
-        // recenter geometry (its vertices are baked in model space, far from origin)
-        c.geometry.computeBoundingBox();
-        const bc = c.geometry.boundingBox.getCenter(new T.Vector3());
-        c.geometry.translate(-bc.x, -bc.y, -bc.z);
-        c.geometry.computeBoundingSphere();
-        c.position.set(-15 + xraySlot * 6, 14, 30);    // open-air row in front of the isle
-        c.rotation.set(0, 0, 0);                       // face the asset's original front
-        c.scale.setScalar(2.2);                        // magnified for inspection
-        xraySlot++;
-      });
     });
 
     // Solid Grassy Mountain Bedrock Foundation
@@ -3014,14 +2992,12 @@
     // ── TEMPORARY X-RAY MODE ──────────────────────────────────────────
     // REVERT THIS COMMIT to restore the island's rocky underside:
     //   git revert <this commit's sha>
-    // Hides the brown rock so the buried meshes can be inspected:
+    // Hides the lower brown rock so the interior can be inspected:
+    heroIslandSlot.visible = false;  // the GLB rock mass + its 6 baked-in trees
     rockTier1.visible = false;       // stepped rock shelf 1
     rockTier2.visible = false;       // stepped rock shelf 2
     hangGarden.visible = false;      // crystals / vines / shard-islets clinging to the rock
     // (the green grass top stays; the under-isle hut + waterfall remain)
-    // The GLB's own rock mesh is hidden inside onModelReady below —
-    // its 6 buried "tree" meshes (the fox + stump + branching poles the
-    // user spotted through the crevices) stay VISIBLE in their true positions.
 
     const vineLeafMat = new T.MeshStandardMaterial({ color: 0x6ee7a0, roughness: 0.7, emissive: 0x166534, emissiveIntensity: 0.9 });
     applyGhibliToon(vineLeafMat, { shadowTint: new T.Color(0x14532d), rimColor: new T.Color(0xbbf7d0) });
