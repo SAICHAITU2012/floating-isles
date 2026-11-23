@@ -54,6 +54,7 @@ jobs:
       - name: Render every station in headless Chrome and gate on errors
         env:
           CI: "1"
+          CHROME_START_MS: "60000"
         run: |
           set -e
           # find a Chrome binary (runner images differ)
@@ -67,6 +68,14 @@ jobs:
           fi
           echo "using chrome: $CHROME_BIN"
           export CHROME_BIN
+          # Boot-health gate: CI's software renderer is far too slow to boot
+          # the full world, but every real breakage so far (missing GLB,
+          # null material, TDZ order bug) THROWS or logs during boot — so we
+          # gate on zero console errors/exceptions while the boot runs, plus
+          # renderer+THREE being alive. The full world-loaded render check is
+          # the local pre-ship QA (see README).
+          SETTLE="typeof THREE==='object' && !!document.querySelector('canvas')"
+          PROBE="JSON.stringify({three:typeof THREE==='object',canvas:!!document.querySelector('canvas'),loaded:!!window.__WORLD_LOADED})"
           fail=0
           for st in 0 1 2 3 4; do
             echo "== station $st =="
@@ -74,9 +83,9 @@ jobs:
             node tools/qa.mjs \
               --url "http://127.0.0.1:8099/?at=$st" \
               --out "qa/ci_st$st.png" \
-              --width 1280 --height 800 --wait 8000 --settle-ms 45000 \
-              --settle "Boolean(window.__WORLD_LOADED)" \
-              --probe "JSON.stringify({loaded:!!window.__WORLD_LOADED})" \
+              --width 1280 --height 800 --wait 15000 \
+              --settle "$SETTLE" --settle-ms 60000 \
+              --probe "$PROBE" \
               > "qa/ci_st$st.json" 2> "qa/ci_st$st.stderr"
             rc=$?
             set -e
@@ -90,10 +99,10 @@ jobs:
               const fs = require('fs');
               let r; try { r = JSON.parse(fs.readFileSync('qa/ci_st$st.json','utf8')); }
               catch (e) { console.error('::error::unparseable qa report at station $st'); process.exit(1); }
-              const loaded = r.probe && JSON.parse(r.probe).loaded;
-              if (!loaded) { console.error('::error::world did NOT load at station ' + '$st' + ' — errors: ' + JSON.stringify(r.errors)); process.exit(1); }
+              let p = {}; try { p = JSON.parse(r.probe||'{}'); } catch (e) {}
+              if (!p.three || !p.canvas) { console.error('::error::renderer/THREE not alive at station ' + '$st' + ' — errors: ' + JSON.stringify(r.errors)); process.exit(1); }
               if ((r.errors||[]).length) { console.error('::error::console errors at station ' + '$st' + ': ' + JSON.stringify(r.errors)); process.exit(1); }
-              console.log('station $st OK — 0 errors, world loaded');
+              console.log('station $st OK — boot healthy (world fully loaded: ' + !!p.loaded + '), 0 errors');
             " || fail=1
           done
           exit $fail

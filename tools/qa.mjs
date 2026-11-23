@@ -65,7 +65,10 @@ const chrome = spawn(
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function json(path) {
-  for (let i = 0; i < 80; i++) {
+  // CI runners cold-start Chrome slowly — allow overriding the budget
+  const budget = Number(process.env.CHROME_START_MS || 9600);
+  const deadline = Date.now() + budget;
+  while (Date.now() < deadline) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}${path}`);
       if (res.ok) return await res.json();
