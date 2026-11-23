@@ -1571,7 +1571,7 @@
     const armGeo = new T.CylinderGeometry(0.10, 0.09, 0.85, 8);
     const sleeveMat = new T.MeshStandardMaterial({ color: dressColor, roughness: 0.6 });
 
-    // Left Arm (holding item or resting on table)
+    // Left Arm (holding item or resting on table) — with its hand
     const armL = new T.Mesh(armGeo, sleeveMat);
     if (isSeated) {
       armL.position.set(-0.58, 1.25 + yOff, 0.15);
@@ -1580,6 +1580,9 @@
       armL.position.set(-0.62, 1.85, 0.05);
       armL.rotation.set(0.1, 0, 0.15);
     }
+    const handL = new T.Mesh(new T.SphereGeometry(0.11, 8, 8), skinMat);
+    handL.position.set(0, -0.47, 0);
+    armL.add(handL);
     group.add(armL);
 
     // Right Arm (Posed for waving or resting)
@@ -1600,6 +1603,36 @@
     const handMesh = new T.Mesh(new T.SphereGeometry(0.11, 8, 8), skinMat);
     handMesh.position.set(0, -0.78, 0);
     waveArmPivot.add(handMesh);
+
+    // Magic Wand — held in the waving hand: gilded shaft, glowing star
+    // tip in her accent colour, twin sparkle slivers that spin forever
+    const wandGroup = new T.Group();
+    wandGroup.position.set(0, -0.86, 0.05);
+    const wandShaft = new T.Mesh(
+      new T.CylinderGeometry(0.028, 0.04, 1.5, 6),
+      new T.MeshStandardMaterial({ color: 0xd97706, metalness: 0.7, roughness: 0.3 })
+    );
+    wandShaft.position.set(0, 0.4, 0);
+    wandGroup.add(wandShaft);
+    const wandTipMat = new T.MeshStandardMaterial({
+      color: accentColor, emissive: accentColor, emissiveIntensity: 3.0, roughness: 0.15,
+    });
+    const wandTip = new T.Mesh(new T.OctahedronGeometry(0.17, 0), wandTipMat);
+    wandTip.position.set(0, 1.22, 0);
+    wandGroup.add(wandTip);
+    const sparkMat = new T.MeshBasicMaterial({ color: 0xfffbeb, transparent: true, opacity: 0.9 });
+    const sparkA = new T.Mesh(new T.BoxGeometry(0.34, 0.045, 0.045), sparkMat);
+    sparkA.position.y = 1.22;
+    wandGroup.add(sparkA);
+    const sparkB = new T.Mesh(new T.BoxGeometry(0.045, 0.34, 0.045), sparkMat);
+    sparkB.position.y = 1.22;
+    wandGroup.add(sparkB);
+    const sparkC = new T.Mesh(new T.BoxGeometry(0.045, 0.045, 0.34), sparkMat);
+    sparkC.position.y = 1.22;
+    wandGroup.add(sparkC);
+    // star tips spin gently forever (register once per girl)
+    rotatingElements.push({ obj: wandGroup, speedY: 0.06 });
+    waveArmPivot.add(wandGroup);
     group.add(waveArmPivot);
 
     // 6. Accessories by Station / Role
@@ -3977,6 +4010,187 @@
       });
     }
 
+    /* ═══════════════════════════════════════════════════════════════════
+       SKY LIFE — joy in the air between the isles: bubbles, butterflies,
+       parachutes, patrolling zeppelins, low balloons & corridor fairies,
+       scattered along the whole flight so no leg of the journey is empty.
+       ═══════════════════════════════════════════════════════════════════ */
+    window.__bubbles = [];
+    window.__corridorButterflies = [];
+    window.__parachutes = [];
+    window.__zeppelins = [];
+
+    // 1. Iridescent soap bubbles drifting up everywhere
+    const bubbleGeo = new T.SphereGeometry(0.55, 12, 10);
+    const bubbleMat = new T.MeshStandardMaterial({
+      color: 0xcfeafd, emissive: 0x7dd3fc, emissiveIntensity: 0.35,
+      transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0.85,
+      depthWrite: false,
+    });
+    const BUBBLE_SPOTS = [
+      [30, 14, -25], [55, 22, -60], [95, 26, -85], [120, 30, -110],
+      [-40, 16, -30], [-75, 20, -55], [-110, 24, -80], [-130, 28, -105],
+      [-120, 34, -160], [-95, 40, -195], [-75, 48, -225], [-65, 52, -255],
+      [40, 30, -180], [30, 36, -240], [15, 40, -300], [8, 44, -340],
+      [65, 24, -130], [-25, 26, -120],
+    ];
+    BUBBLE_SPOTS.forEach((p, i) => {
+      for (let k = 0; k < 2; k++) {
+        const bub = new T.Mesh(bubbleGeo, bubbleMat);
+        const bx = p[0] + (Math.random() - 0.5) * 10;
+        const bz = p[2] + (Math.random() - 0.5) * 10;
+        bub.position.set(bx, p[1] + Math.random() * 8, bz);
+        bub.scale.setScalar(0.5 + Math.random() * 0.9);
+        scene.add(bub);
+        window.__bubbles.push({
+          mesh: bub, baseY: 6 + Math.random() * 6, range: 34 + Math.random() * 20,
+          speed: 0.55 + Math.random() * 0.5, seed: Math.random() * 20,
+          baseX: bx, baseZ: bz,
+        });
+      }
+    });
+
+    // 2. Butterflies fluttering along every corridor (colourful mix)
+    const CORRIDOR_BFLY = [
+      { color: 0xf472b6, p: [55, 18, -50], rx: 14, rz: 10, speed: 0.0021 },
+      { color: 0x38bdf8, p: [95, 24, -85], rx: 16, rz: 11, speed: 0.0019 },
+      { color: 0xa855f7, p: [-75, 18, -55], rx: 15, rz: 10, speed: 0.0022 },
+      { color: 0x10b981, p: [-115, 28, -150], rx: 17, rz: 12, speed: 0.0018 },
+      { color: 0xf59e0b, p: [-80, 42, -215], rx: 16, rz: 11, speed: 0.0020 },
+      { color: 0xec4899, p: [40, 32, -190], rx: 14, rz: 10, speed: 0.0021 },
+      { color: 0x06b6d4, p: [25, 38, -265], rx: 15, rz: 11, speed: 0.0019 },
+      { color: 0xf97316, p: [-30, 34, -310], rx: 14, rz: 10, speed: 0.0022 },
+    ];
+    CORRIDOR_BFLY.forEach((cfg, i) => {
+      const bfly = create3DButterfly(cfg.color, 1.7);
+      scene.add(bfly.group);
+      window.__corridorButterflies.push({
+        ...bfly,
+        centerX: cfg.p[0], baseY: cfg.p[1], centerZ: cfg.p[2],
+        radiusX: cfg.rx, radiusZ: cfg.rz,
+        flightSpeed: cfg.speed, flapSpeed: 21, offset: i * 1.7, seed: i * 2.3,
+      });
+    });
+
+    // 3. Little parachutes with tiny explorer baskets, drifting down & swaying
+    function createParachute(canopyColor) {
+      const g = new T.Group();
+      const canopy = new T.Mesh(
+        new T.SphereGeometry(1.6, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+        new T.MeshStandardMaterial({ color: canopyColor, roughness: 0.55, side: T.DoubleSide, flatShading: true })
+      );
+      canopy.scale.set(1, 0.62, 1);
+      canopy.castShadow = true;
+      g.add(canopy);
+      const trim = new T.Mesh(
+        new T.TorusGeometry(1.58, 0.06, 6, 20),
+        new T.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.5 })
+      );
+      trim.rotation.x = Math.PI / 2;
+      trim.position.y = 0.02;
+      g.add(trim);
+      const stringMat = new T.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 });
+      [[-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]].forEach(([sx, sz]) => {
+        const str = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 1.7, 4), stringMat);
+        str.position.set(sx * 0.5, -0.85, sz * 0.5);
+        str.rotation.set(sz * 0.28, 0, -sx * 0.28);
+        g.add(str);
+      });
+      const basket = new T.Mesh(
+        new T.BoxGeometry(0.55, 0.42, 0.55),
+        new T.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 })
+      );
+      basket.position.y = -1.75;
+      basket.castShadow = true;
+      g.add(basket);
+      return g;
+    }
+    [
+      { c: 0xf43f5e, p: [70, 52, -75] }, { c: 0x22d3ee, p: [-85, 58, -140] },
+      { c: 0xa78bfa, p: [35, 62, -250] }, { c: 0xfbbf24, p: [-45, 56, -320] },
+    ].forEach((cfg, i) => {
+      const chute = createParachute(cfg.c);
+      chute.position.set(...cfg.p);
+      scene.add(chute);
+      window.__parachutes.push({ group: chute, baseY: cfg.p[1], seed: i * 3.1, drift: 0.5 + i * 0.12 });
+    });
+
+    // 4. Low hot-air balloons — moved below, after skyBalloons is declared
+    //    (the fleet section owns the balloon registry)
+
+    // 5. More fairies sprinkled along the corridors
+    [
+      [80, 26, -70, 0xf9a8d4], [-120, 20, -80, 0x7dd3fc], [-100, 34, -168, 0xfde047],
+      [60, 36, -240, 0xc4b5fd], [-25, 40, -300, 0x6ee7b7], [5, 34, -335, 0xfda4af],
+    ].forEach(([fx, fy, fz, fc], i) => {
+      const fairy = createFairy(fc);
+      scene.add(fairy.group);
+      flyingFairies.push({
+        ...fairy,
+        centerX: fx, centerY: fy, centerZ: fz,
+        radius: 7 + (i % 3) * 3,
+        speed: 0.0016 + (i % 4) * 0.0004,
+        offset: i * 1.3,
+      });
+    });
+
+    // 6. Mini zeppelins — cosy patrol airships with spinning propellers
+    function createZeppelin(bodyColor, trimColor) {
+      const g = new T.Group();
+      const envMat = new T.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, flatShading: true });
+      applyGhibliToon(envMat, { shadowTint: new T.Color(0x334155), rimColor: new T.Color(0xffffff) });
+      const envelope = new T.Mesh(new T.SphereGeometry(1, 14, 10), envMat);
+      envelope.scale.set(1.15, 1.15, 3.4);
+      envelope.castShadow = true;
+      g.add(envelope);
+      const band = new T.Mesh(
+        new T.TorusGeometry(1.16, 0.07, 6, 20),
+        new T.MeshStandardMaterial({ color: trimColor, roughness: 0.5 })
+      );
+      band.rotation.y = Math.PI / 2;
+      band.position.z = 0.4;
+      g.add(band);
+      const finGeo = new T.ConeGeometry(0.55, 1.1, 4);
+      const finMat = new T.MeshStandardMaterial({ color: trimColor, roughness: 0.5 });
+      // top, left, right tail fins — cones pointing backward (-Z)
+      const finTop = new T.Mesh(finGeo, finMat);
+      finTop.position.set(0, 0.85, -3.3);
+      finTop.rotation.x = -Math.PI / 2;
+      g.add(finTop);
+      const finL = new T.Mesh(finGeo, finMat);
+      finL.position.set(-0.85, 0, -3.3);
+      finL.rotation.z = Math.PI / 2;
+      g.add(finL);
+      const finR = new T.Mesh(finGeo, finMat);
+      finR.position.set(0.85, 0, -3.3);
+      finR.rotation.z = -Math.PI / 2;
+      g.add(finR);
+      const gondola = new T.Mesh(
+        new T.BoxGeometry(0.55, 0.4, 1.1),
+        new T.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 })
+      );
+      gondola.position.set(0, -1.25, 0.3);
+      gondola.castShadow = true;
+      g.add(gondola);
+      const propMat = new T.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4, metalness: 0.5 });
+      const props = [];
+      [-0.45, 0.45].forEach((px) => {
+        const prop = new T.Mesh(new T.BoxGeometry(0.08, 1.0, 0.12), propMat);
+        prop.position.set(px, -1.1, 0.95);
+        g.add(prop);
+        props.push(prop);
+      });
+      return { group: g, props };
+    }
+    [
+      { c: 0xfb7185, t: 0xfffbeb, p: [50, 40, -120], r: 46, speed: 0.00035 },
+      { c: 0x2dd4bf, t: 0xffffff, p: [-70, 46, -255], r: 40, speed: 0.0003 },
+    ].forEach((cfg, i) => {
+      const zep = createZeppelin(cfg.c, cfg.t);
+      scene.add(zep.group);
+      window.__zeppelins.push({ ...zep, cx: cfg.p[0], cy: cfg.p[1], cz: cfg.p[2], radius: cfg.r, speed: cfg.speed, phase: i * 2.4, seed: i * 5 });
+    });
+
     // Ground Animals & Fairies on Station 0 (Hero Isle)
     [[-3, 11.2, 5], [2, 10.4, 7], [-6, 11.2, 2]].forEach((pos) => {
       const b = createBunny();
@@ -4242,6 +4456,20 @@
     };
     balloonConfigs.forEach(refitOrbit);
 
+    // Low hot-air balloons — the fleet also comes DOWN among the isles,
+    // drifting along the flight corridors so no leg is empty
+    [
+      { colorA: 0xfb7185, colorB: 0xfff1f2, scale: 1.15, baseY: 46, centerX: 68, centerZ: -70, rx: 34, rz: 26, speed: 0.0006, phase: 1.2 },
+      { colorA: 0x34d399, colorB: 0xecfdf5, scale: 1.05, baseY: 38, centerX: -100, centerZ: -70, rx: 30, rz: 24, speed: 0.0007, phase: 2.8 },
+      { colorA: 0x818cf8, colorB: 0xeef2ff, scale: 1.1, baseY: 44, centerX: -95, centerZ: -190, rx: 32, rz: 25, speed: 0.00065, phase: 4.4 },
+      { colorA: 0xfbbf24, colorB: 0xfffbeb, scale: 1.0, baseY: 52, centerX: 30, centerZ: -250, rx: 28, rz: 22, speed: 0.00075, phase: 0.6 },
+      { colorA: 0x2dd4bf, colorB: 0xf0fdfa, scale: 1.12, baseY: 46, centerX: -20, centerZ: -320, rx: 30, rz: 24, speed: 0.0006, phase: 5.2 },
+    ].forEach((cfg) => {
+      const b = createHotAirBalloon(cfg);
+      scene.add(b.group);
+      skyBalloons.push(b);
+    });
+
     balloonConfigs.forEach((cfg) => {
       const b = createHotAirBalloon({
         colorA: cfg.colorA,
@@ -4365,16 +4593,17 @@
 
   // 5 Station Camera Viewpoints [pos, target]
   const CAMERA_WAYPOINTS = [
-    // 00 — ISLE: Wide establishing view framing hero island, cottage, grand oak & waterfall
-    { pos: new T.Vector3(-18, 28, 62),   target: new T.Vector3(4, 9, 0) },
-    // 01 — OBSERVATORY: High & far enough back that the whole ferris wheel fits the frame
-    { pos: new T.Vector3(79, 65, 9),    target: new T.Vector3(141, 15, -97) },
-    // 02 — ARCHIPELAGO: Low golden-hour panorama across the suspension-bridge chain
-    { pos: new T.Vector3(-194, 24, -24), target: new T.Vector3(-130, 4, -92) },
-    // 03 — CONSTELLATION: Immersive starlight glide straight through the glowing crystals
-    { pos: new T.Vector3(-55, 75, -170), target: new T.Vector3(-55, 68, -235) },
-    // 04 — PORTAL: Elevated eye-level view directly into the stone rune gate and vortex
-    { pos: new T.Vector3(5, 36, -320),   target: new T.Vector3(5, 28, -360) },
+    // 00 — ISLE: Intimate establishing view — the whole isle reads at first
+    // glance (cottage, Sakura, spring, waterfall), companions on the horizon
+    { pos: new T.Vector3(-14, 22, 46),   target: new T.Vector3(3, 10.5, 1) },
+    // 01 — OBSERVATORY: Close enough to count the gondolas, wheel fully framed
+    { pos: new T.Vector3(94, 52, -18),  target: new T.Vector3(141, 15, -97) },
+    // 02 — ARCHIPELAGO: Golden-hour view across the bridge chain, near & readable
+    { pos: new T.Vector3(-178, 19, -41), target: new T.Vector3(-130, 4, -92) },
+    // 03 — CONSTELLATION: Drifting among the glowing stars, up close
+    { pos: new T.Vector3(-55, 73, -183), target: new T.Vector3(-55, 68, -235) },
+    // 04 — PORTAL: Eye-level with the gate and its guardians
+    { pos: new T.Vector3(5, 34, -330),   target: new T.Vector3(5, 28, -360) },
   ];
 
   let currentStationProgress = FORCED_STATION !== null ? FORCED_STATION : 0;
@@ -4843,14 +5072,65 @@
     // Animate procedural soaring birds (zero skinning glitches)
     flyingBirds.forEach((b) => {
       const angle = elapsedTime * b.speed * 120.0 + b.offset;
-      b.group.position.x = Math.cos(angle) * b.radius;
-      b.group.position.z = Math.sin(angle) * b.radius;
+      const bcx = b.centerX || 0, bcz = b.centerZ || 0;
+      b.group.position.x = bcx + Math.cos(angle) * b.radius;
+      b.group.position.z = bcz + Math.sin(angle) * b.radius;
       b.group.position.y = b.baseY + Math.sin(angle * 2.0) * 3.5;
       b.group.rotation.y = -angle + Math.PI / 2;
       const flap = Math.sin(elapsedTime * 6.5 + b.offset) * 0.45;
       b.wingL.rotation.z = flap;
       b.wingR.rotation.z = -flap;
     });
+
+    // SKY LIFE — bubbles, corridor butterflies, parachutes, zeppelins
+    if (window.__bubbles) {
+      window.__bubbles.forEach((b) => {
+        const t = (elapsedTime * b.speed * 0.5 + b.seed) % b.range;
+        b.mesh.position.y = b.baseY + t;
+        b.mesh.position.x = b.baseX + Math.sin(elapsedTime * 0.6 + b.seed) * 1.6;
+        b.mesh.position.z = b.baseZ + Math.cos(elapsedTime * 0.5 + b.seed * 1.3) * 1.6;
+        const fade = Math.sin((t / b.range) * Math.PI);
+        b.mesh.material.opacity = 0.12 + fade * 0.22;
+      });
+    }
+    if (window.__corridorButterflies) {
+      window.__corridorButterflies.forEach((bf) => {
+        const a = elapsedTime * bf.flightSpeed * 60.0 + bf.offset;
+        bf.group.position.set(
+          bf.centerX + Math.cos(a) * bf.radiusX,
+          bf.baseY + Math.sin(elapsedTime * 1.4 + bf.seed) * 2.2,
+          bf.centerZ + Math.sin(a) * bf.radiusZ
+        );
+        const dx = -Math.sin(a) * bf.radiusX, dz = Math.cos(a) * bf.radiusZ;
+        bf.group.rotation.y = Math.atan2(dx, dz) + Math.PI;
+        bf.group.rotation.z = Math.sin(elapsedTime * 2.2 + bf.seed) * 0.14;
+        const flap = Math.sin(elapsedTime * bf.flapSpeed + bf.seed) * 0.9;
+        bf.wingHolderL.rotation.y = flap;
+        bf.wingHolderR.rotation.y = -flap;
+      });
+    }
+    if (window.__parachutes) {
+      window.__parachutes.forEach((p) => {
+        const drift = (elapsedTime * p.drift * 1.6 + p.seed * 12) % 46;
+        p.group.position.y = p.baseY + 18 - drift;
+        p.group.position.x += Math.sin(elapsedTime * 0.5 + p.seed) * 0.012;
+        p.group.rotation.z = Math.sin(elapsedTime * 0.9 + p.seed) * 0.1;
+        p.group.rotation.x = Math.sin(elapsedTime * 0.7 + p.seed * 1.7) * 0.08;
+      });
+    }
+    if (window.__zeppelins) {
+      window.__zeppelins.forEach((z) => {
+        const a = elapsedTime * z.speed * 60.0 + z.phase;
+        z.group.position.set(
+          z.cx + Math.cos(a) * z.radius,
+          z.cy + Math.sin(elapsedTime * 0.6 + z.seed) * 3.0,
+          z.cz + Math.sin(a) * z.radius * 0.72
+        );
+        z.group.rotation.y = -a;
+        z.group.rotation.z = Math.sin(elapsedTime * 0.8 + z.seed) * 0.05;
+        z.props.forEach((pr, pi) => { pr.rotation.z = elapsedTime * (14 + pi * 3); });
+      });
+    }
 
     // Gentle cloud sea drift
     cloudSeaGroup.rotation.y = elapsedTime * 0.008;

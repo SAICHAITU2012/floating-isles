@@ -682,21 +682,64 @@
       minimapCanvas.style.cursor = hovered ? "pointer" : "crosshair";
     });
 
-    // Mini-map animation loop
+    // ── Mini-map animation loop (upgraded: curved routes, isle nodes,
+    //    flowing dash, pulsing beacon, compass) ──
+    const qPoint = (p0, c, p1, t) => {
+      const u = 1 - t;
+      return {
+        x: u * u * p0.x + 2 * u * t * c.x + t * t * p1.x,
+        y: u * u * p0.y + 2 * u * t * c.y + t * t * p1.y,
+      };
+    };
+    const segCtrl = (a, b) => {
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      return { x: mx - (dy / len) * 15, y: my + (dx / len) * 15 };
+    };
+
+    function drawHexIsle(x, y, r, color) {
+      mctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 6 + (i / 6) * Math.PI * 2;
+        const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.55;
+        i === 0 ? mctx.moveTo(px, py) : mctx.lineTo(px, py);
+      }
+      mctx.closePath();
+      const g = mctx.createLinearGradient(x - r, y - r / 2, x + r, y + r / 2);
+      g.addColorStop(0, "rgba(52, 211, 153, 0.95)");
+      g.addColorStop(1, "rgba(6, 78, 59, 0.95)");
+      mctx.fillStyle = g;
+      mctx.fill();
+      mctx.strokeStyle = "rgba(167, 243, 208, 0.55)";
+      mctx.lineWidth = 1;
+      mctx.stroke();
+      // little gem floating over the isle
+      mctx.fillStyle = color;
+      mctx.beginPath();
+      mctx.moveTo(x, y - r * 0.95);
+      mctx.lineTo(x + 3.2, y - r * 0.55);
+      mctx.lineTo(x, y - r * 0.15);
+      mctx.lineTo(x - 3.2, y - r * 0.55);
+      mctx.closePath();
+      mctx.fill();
+    }
+
     function renderMinimap(now) {
       requestAnimationFrame(renderMinimap);
 
       const w = minimapCanvas.width;
       const h = minimapCanvas.height;
+      const time = (now || 0) * 0.001;
 
-      // Background starry night gradient
+      // Deep twilight gradient
       const bgGrad = mctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 1.4);
-      bgGrad.addColorStop(0, "rgba(23, 37, 84, 0.95)");
-      bgGrad.addColorStop(1, "rgba(8, 12, 26, 0.98)");
+      bgGrad.addColorStop(0, "rgba(30, 41, 99, 0.96)");
+      bgGrad.addColorStop(1, "rgba(6, 10, 24, 0.98)");
       mctx.fillStyle = bgGrad;
       mctx.fillRect(0, 0, w, h);
 
-      // Delicate starry grid lines
+      // Starry grid + a few twinkles
       mctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
       mctx.lineWidth = 1;
       for (let gx = 20; gx < w; gx += 30) {
@@ -705,84 +748,111 @@
       for (let gy = 20; gy < h; gy += 30) {
         mctx.beginPath(); mctx.moveTo(0, gy); mctx.lineTo(w, gy); mctx.stroke();
       }
-
-      // Golden flight route connecting stations in sequence
-      mctx.beginPath();
-      mctx.strokeStyle = "rgba(251, 191, 36, 0.4)";
-      mctx.lineWidth = 1.5;
-      mctx.setLineDash([4, 4]);
-      for (let i = 0; i < MAP_STATIONS.length; i++) {
-        const pt = MAP_STATIONS[i];
-        if (i === 0) mctx.moveTo(pt.x, pt.y);
-        else mctx.lineTo(pt.x, pt.y);
+      mctx.fillStyle = "rgba(226, 232, 240, 0.8)";
+      for (let s = 0; s < 10; s++) {
+        const sx = ((s * 73 + 31) % (w - 14)) + 7;
+        const sy = ((s * 137 + 53) % (h - 14)) + 7;
+        const tw = 0.35 + 0.65 * Math.abs(Math.sin(time * 1.4 + s * 1.9));
+        mctx.globalAlpha = tw * 0.55;
+        mctx.fillRect(sx, sy, 1.6, 1.6);
       }
-      mctx.stroke();
+      mctx.globalAlpha = 1;
+
+      // Compass rose (top-right)
+      mctx.save();
+      mctx.translate(w - 18, 18);
+      mctx.strokeStyle = "rgba(125, 211, 252, 0.5)";
+      mctx.fillStyle = "rgba(125, 211, 252, 0.65)";
+      mctx.lineWidth = 1;
+      mctx.beginPath(); mctx.arc(0, 0, 8, 0, Math.PI * 2); mctx.stroke();
+      mctx.beginPath();
+      mctx.moveTo(0, -6); mctx.lineTo(2.4, 2); mctx.lineTo(0, 0.6); mctx.lineTo(-2.4, 2);
+      mctx.closePath(); mctx.fill();
+      mctx.fillStyle = "rgba(226, 232, 240, 0.8)";
+      mctx.font = "6px monospace"; mctx.textAlign = "center";
+      mctx.fillText("N", 0, -10);
+      mctx.restore();
+
+      // Curved golden flight routes with flowing dash
+      mctx.lineWidth = 1.6;
+      mctx.strokeStyle = "rgba(251, 191, 36, 0.55)";
+      mctx.setLineDash([5, 5]);
+      mctx.lineDashOffset = -time * 14;
+      const SEGS = [];
+      for (let i = 0; i < MAP_STATIONS.length - 1; i++) {
+        const c = segCtrl(MAP_STATIONS[i], MAP_STATIONS[i + 1]);
+        SEGS.push(c);
+        mctx.beginPath();
+        mctx.moveTo(MAP_STATIONS[i].x, MAP_STATIONS[i].y);
+        mctx.quadraticCurveTo(c.x, c.y, MAP_STATIONS[i + 1].x, MAP_STATIONS[i + 1].y);
+        mctx.stroke();
+      }
       mctx.setLineDash([]);
 
-      // Draw Station Nodes
+      // Floating isle nodes + labels
+      mctx.font = "8px monospace";
+      mctx.textAlign = "center";
       MAP_STATIONS.forEach((st) => {
-        // Glowing halo
-        const haloGrad = mctx.createRadialGradient(st.x, st.y, 2, st.x, st.y, 14);
-        haloGrad.addColorStop(0, st.color);
-        haloGrad.addColorStop(1, "transparent");
-        mctx.fillStyle = haloGrad;
+        drawHexIsle(st.x, st.y + 4, 8, st.color);
+        const halo = mctx.createRadialGradient(st.x, st.y, 1, st.x, st.y, 13);
+        halo.addColorStop(0, st.color);
+        halo.addColorStop(1, "transparent");
+        mctx.fillStyle = halo;
         mctx.beginPath();
-        mctx.arc(st.x, st.y, 14, 0, Math.PI * 2);
+        mctx.arc(st.x, st.y, 13, 0, Math.PI * 2);
+        mctx.globalAlpha = 0.4;
         mctx.fill();
-
-        // Node center
-        mctx.fillStyle = st.color;
+        mctx.globalAlpha = 1;
+        mctx.fillStyle = "#f8fafc";
         mctx.beginPath();
-        mctx.arc(st.x, st.y, 5, 0, Math.PI * 2);
+        mctx.arc(st.x, st.y, 3.2, 0, Math.PI * 2);
         mctx.fill();
-
-        mctx.strokeStyle = "#ffffff";
-        mctx.lineWidth = 1.2;
-        mctx.stroke();
-
-        // Node label
         mctx.fillStyle = "rgba(248, 250, 252, 0.85)";
-        mctx.font = "8px monospace";
-        mctx.textAlign = "center";
-        mctx.fillText(st.short, st.x, st.y + 13);
+        mctx.fillText(st.short, st.x, st.y + 20);
       });
 
-      // Animated "YOU ARE HERE" Beacon Marker
+      // Pulsing ring on the current isle
+      const curStation = MAP_STATIONS[Math.min(4, Math.round(prog0f()))];
+      if (curStation) {
+        const pr = 8 + (time * 26) % 14;
+        mctx.strokeStyle = `rgba(244, 63, 94, ${Math.max(0, 0.75 - ((time * 26) % 14) / 18)})`;
+        mctx.lineWidth = 1.6;
+        mctx.beginPath();
+        mctx.arc(curStation.x, curStation.y, pr, 0, Math.PI * 2);
+        mctx.stroke();
+      }
+
+      // Traveller on the curved route
       const prog = typeof window.__getCurrentProgress === "function" ? window.__getCurrentProgress() : 0;
       const stIdx = Math.min(Math.floor(prog), MAP_STATIONS.length - 2);
       const frac = Math.max(0, Math.min(1, prog - stIdx));
-      const sA = MAP_STATIONS[stIdx];
-      const sB = MAP_STATIONS[stIdx + 1];
+      const pt = qPoint(MAP_STATIONS[stIdx], SEGS[stIdx], MAP_STATIONS[stIdx + 1], frac);
 
-      const curX = sA.x + (sB.x - sA.x) * frac;
-      const curY = sA.y + (sB.y - sA.y) * frac;
-
-      // Pulsing ripple ring
-      const pulseTime = (now || 0) * 0.003;
+      const pulseTime = time;
       const pulseR = 6 + (pulseTime % 1.0) * 12;
       const pulseAlpha = Math.max(0, 1.0 - (pulseTime % 1.0));
-
       mctx.strokeStyle = `rgba(236, 72, 153, ${pulseAlpha})`;
       mctx.lineWidth = 1.8;
       mctx.beginPath();
-      mctx.arc(curX, curY, pulseR, 0, Math.PI * 2);
+      mctx.arc(pt.x, pt.y, pulseR, 0, Math.PI * 2);
       mctx.stroke();
 
-      // Sharp glowing traveler dot
       mctx.fillStyle = "#f43f5e";
       mctx.beginPath();
-      mctx.arc(curX, curY, 4, 0, Math.PI * 2);
+      mctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
       mctx.fill();
       mctx.strokeStyle = "#ffffff";
       mctx.lineWidth = 1.5;
       mctx.stroke();
 
-      // Current Station Name in Footer
-      const curStation = MAP_STATIONS[Math.min(4, Math.round(prog))];
       if (minimapLoc && curStation) {
         minimapLoc.textContent = curStation.name;
       }
     }
+    const prog0f = () => {
+      const p = typeof window.__getCurrentProgress === "function" ? window.__getCurrentProgress() : 0;
+      return Math.min(4, Math.max(0, p));
+    };
     requestAnimationFrame(renderMinimap);
   }
 
