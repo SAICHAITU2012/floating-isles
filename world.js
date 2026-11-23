@@ -3130,7 +3130,7 @@
     const hutTimberMat = new T.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.85, flatShading: true });
     applyGhibliToon(hutTimberMat, { shadowTint: new T.Color(0x4a3728) });
     const underHut = new T.Group();
-    underHut.position.set(-12, -5.4, 6.2);
+    underHut.position.set(-17.4, -5.6, 8.9);
     underHut.rotation.y = 0.55;
     // hanging stone terrace — tapers downward, embedding up into the belly
     const terraceRock = new T.Mesh(new T.CylinderGeometry(3.2, 2.1, 3.0, 9), rockMat);
@@ -3139,26 +3139,45 @@
     terraceRock.receiveShadow = true;
     underHut.add(terraceRock);
     // grass cap so the terrace reads as a little hanging meadow
-    const terraceGrass = new T.Mesh(new T.CylinderGeometry(3.35, 3.05, 0.5, 9), grassTopMat);
+    const terraceGrass = new T.Mesh(new T.CylinderGeometry(2.9, 2.65, 0.5, 9), grassTopMat);
     terraceGrass.position.y = 0.35;
     terraceGrass.castShadow = true;
     terraceGrass.receiveShadow = true;
     underHut.add(terraceGrass);
+    // small stone pad so the hut sits clearly ON the meadow, its base never
+    // swallowed by the terrace rim from shallow camera angles
+    const hutPadMat = new T.MeshStandardMaterial({ color: 0x8b9bad, roughness: 0.95, flatShading: true });
+    applyGhibliToon(hutPadMat, { shadowTint: new T.Color(0x334155), rimColor: new T.Color(0xd7dee8) });
+    const hutPad = new T.Mesh(new T.CylinderGeometry(1.7, 1.9, 0.3, 9), hutPadMat);
+    hutPad.position.set(0.1, 0.72, 0.2);
+    hutPad.castShadow = true;
+    hutPad.receiveShadow = true;
+    underHut.add(hutPad);
     // the hut itself — same storybook palette as the cottage above
     attachModelSlot("cottage", underHut, 4.4, false, (m) => {
-      m.position.set(0.1, 0.58, 0.2);
+      m.position.set(0.1, 0.95, 0.2);
       m.rotation.set(0, 0.5, 0);
       repaintStorybookCottage(m);
     });
-    // two timber struts bracing the terrace up into the rock
-    [[-2.3, 1.6, 1.2, 0.5], [2.1, 1.6, 1.4, -0.5]].forEach(([sx, sy, sz, rz]) => {
-      const strut = new T.Mesh(new T.BoxGeometry(0.26, 3.4, 0.26), hutTimberMat);
-      strut.position.set(sx, sy, sz);
-      strut.rotation.z = rz;
-      strut.rotation.x = 0.3;
-      strut.castShadow = true;
-      underHut.add(strut);
-    });
+    // suspension: a stout timber bracket arm braced into the belly plus two
+    // hemp tethers — the hut hangs BESIDE the rock in open air (never under
+    // an overhang), so it is visible from the establishing camera, from zoomed
+    // views and from orbit-under angles alike (raycast-verified)
+    const hangRopeMat = new T.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
+    function tieBar(a, b, radius) {
+      const dir = new T.Vector3().subVectors(b, a);
+      const len = dir.length();
+      const bar = new T.Mesh(new T.CylinderGeometry(radius, radius, len, 6), hangRopeMat);
+      bar.position.copy(a).addScaledVector(dir, 0.5);
+      bar.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), dir.normalize());
+      bar.castShadow = true;
+      return bar;
+    }
+    // bracket arm: buried end inside the belly, foot on the terrace's inner rim
+    station0Group.add(tieBar(new T.Vector3(-11.6, -2.0, 6.9), new T.Vector3(-14.6, -5.9, 7.5), 0.24));
+    // two taut tethers from the terrace rim up into the rock
+    station0Group.add(tieBar(new T.Vector3(-16.2, -6.2, 6.4), new T.Vector3(-10.6, -0.6, 4.8), 0.06));
+    station0Group.add(tieBar(new T.Vector3(-18.2, -6.4, 10.6), new T.Vector3(-12.0, -1.0, 9.8), 0.06));
     // a warm lantern on the terrace rim
     const hutLanternPost = new T.Mesh(new T.CylinderGeometry(0.06, 0.09, 1.5, 6), hutTimberMat);
     hutLanternPost.position.set(2.35, 1.1, 1.3);
