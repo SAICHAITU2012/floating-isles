@@ -628,6 +628,21 @@
       minimapCard.classList.toggle("minimized");
       minimapToggleBtn.textContent = minimapCard.classList.contains("minimized") ? "+" : "_";
     });
+    // Phones: start folded so the realm, not the map, owns the screen
+    if (window.innerWidth <= 880) {
+      minimapCard.classList.add("minimized");
+      minimapToggleBtn.textContent = "+";
+    }
+  }
+
+  // The orbit hint teaches the gesture once, then gets out of the way
+  const orbitHint = document.getElementById("orbit-hint");
+  if (orbitHint) {
+    const hideHint = () => orbitHint.classList.add("fade-out");
+    setTimeout(hideHint, window.innerWidth <= 880 ? 6000 : 11000);
+    window.addEventListener("pointerdown", hideHint, { once: true });
+    window.addEventListener("wheel", hideHint, { once: true, passive: true });
+    window.addEventListener("touchmove", hideHint, { once: true, passive: true });
   }
 
   const MAP_STATIONS = [
@@ -890,6 +905,27 @@
   /* ── 9 · misc + QA hooks ────────────────────────────────────── */
 
   $("#year").textContent = new Date().getFullYear();
+
+  /* ── 8.6 · graceful no-WebGL fallback ─────────────────────────
+     world.js marks <html class="no-world"> when it cannot build a
+     renderer. The page still has to be a portfolio, so drop the loader
+     and open the hero dossier instead of leaving a stuck boot screen. */
+  function startNoWorldFallback() {
+    if (!document.documentElement.classList.contains("no-world")) return;
+    document.documentElement.classList.add("no-world-ready");
+    finishBoot();
+    const note = document.getElementById("boot-status");
+    if (note) note.textContent = "3D unavailable on this device — showing the dossier instead";
+    setTimeout(() => {
+      if (typeof window.__openIslandDossier === "function") window.__openIslandDossier(0);
+    }, 1100);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startNoWorldFallback);
+  } else {
+    startNoWorldFallback();
+  }
+  setTimeout(startNoWorldFallback, 2500);
 
   if (PARAMS.has("at")) { // screenshot hook: ?at=0..4 jumps to a station
     const idx = Math.min(4, Math.max(0, parseInt(PARAMS.get("at"), 10)));

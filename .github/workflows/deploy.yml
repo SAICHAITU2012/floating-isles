@@ -1,0 +1,57 @@
+name: Deploy the Floating Realm
+
+# Every push to main lands on GitHub Pages within a minute or two.
+# No tunnel, no local server, no laptop that has to stay awake: Pages is a
+# static CDN with 99.9%+ uptime, so the link is the same URL forever.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Re-deploy monthly so a stale build never rots, even with no commits.
+  schedule:
+    - cron: "0 4 1 * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify the build is complete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every file index.html asks for must exist
+        run: node tools/verify-build.mjs
+      - name: Syntax-check the two big scripts
+        run: |
+          node --check app.js
+          node --check world.js
+          node --check tools/server.mjs
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble the site (only files the page needs)
+        run: node tools/build-site.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

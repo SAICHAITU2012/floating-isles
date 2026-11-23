@@ -1,0 +1,7 @@
+# QA artefacts — never deployed, never committed
+qa/
+*.png
+!assets/**/*.png
+_site/
+.DS_Store
+node_modules/

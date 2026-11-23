@@ -31,14 +31,24 @@
 
   /* ── 1. RENDERER & COMPOSER SETUP ──────────────────────────────────── */
 
-  const renderer = new T.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: false,
-    powerPreference: "high-performance",
-    stencil: false,
-    depth: true,
-  });
+  let renderer;
+  try {
+    renderer = new T.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+      stencil: false,
+      depth: true,
+    });
+  } catch (err) {
+    // No WebGL (very old browser, blocked GPU, headless without swiftshader).
+    // The page must still be a portfolio, not a stuck loader.
+    console.warn("[world] WebGL unavailable — falling back to the dossier:", err);
+    document.documentElement.classList.add("no-world");
+    canvas.style.display = "none";
+    return;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE() ? 1.5 : 2.0));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x7dd3fc, 1.0);
@@ -604,18 +614,26 @@
         float t = clamp((r - 95.0) / (125.0 - 95.0), 0.0, 1.0);
         vec3 col = getRainbow(t);
 
+        // A real bow is pale and soft-edged, not seven neon stripes: pull a
+        // little saturation out, lift toward white, and let faint
+        // supernumerary ripples break up the banding.
+        float bandLum = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(col, vec3(bandLum), 0.20);
+        col = mix(col, vec3(1.0), 0.16);
+        col *= 0.92 + 0.08 * sin(t * 30.0);
+
         // Night: wash the spectral bands toward a pale silver moonbow
         float lum = dot(col, vec3(0.299, 0.587, 0.114));
         col = mix(col, vec3(lum) * vec3(0.78, 0.86, 1.05) + vec3(0.10, 0.12, 0.18), uNight);
-        
+
         // Soft edge feathering across inner and outer ring boundaries
         float edgeRad = sin(t * 3.14159265);
         edgeRad = smoothstep(0.01, 0.22, edgeRad);
-        
+
         // Soft fade into horizon clouds at the arch bases (vLocalPos.y near 0)
         float edgeArc = smoothstep(0.0, 18.0, vLocalPos.y);
-        
-        float alpha = edgeRad * edgeArc * 0.94 * uAlpha;
+
+        float alpha = edgeRad * edgeArc * 0.52 * uAlpha;
         gl_FragColor = vec4(col, alpha);
       }
     `,
@@ -3038,69 +3056,54 @@
       m.position.set(-7.5, 10.2, 9.0);
     });
 
-    // 5. Stylized Turquoise Lake with Caustics & Shoreline Foam
-    const lakeGeo = new T.CircleGeometry(11.5, 32);
-    const lakeMat = new T.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      uniforms: {
-        uTime: { value: 0 },
-        uDeepColor: { value: new T.Color(0x0369a1) },   // Deep turquoise
-        uShallowColor: { value: new T.Color(0x06b6d4) },// Bright cyan shore
-        uFoamColor: { value: new T.Color(0xe0f2fe) },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform vec3 uDeepColor;
-        uniform vec3 uShallowColor;
-        uniform vec3 uFoamColor;
-        varying vec2 vUv;
-
-        // Animated Voronoi-like caustic water pattern
-        float caustics(vec2 p) {
-          vec2 p1 = p * 4.0 + vec2(uTime * 0.35, uTime * 0.25);
-          vec2 p2 = p * 6.0 - vec2(uTime * 0.2, uTime * 0.3);
-          float c1 = sin(p1.x + sin(p1.y));
-          float c2 = cos(p2.x - cos(p2.y));
-          return pow(abs(c1 + c2) * 0.5, 2.5);
-        }
-
-        void main() {
-          float dist = distance(vUv, vec2(0.5));
-          if (dist > 0.49) discard;
-
-          vec3 base = mix(uShallowColor, uDeepColor, smoothstep(0.15, 0.48, dist));
-          float caust = caustics(vUv);
-          base += caust * 0.35;
-
-          // Shoreline foam ring
-          float shore = smoothstep(0.44, 0.49, dist);
-          base = mix(base, uFoamColor, shore * 0.65);
-
-          gl_FragColor = vec4(base, 0.88);
-        }
-      `,
-    });
-    const lake = new T.Mesh(lakeGeo, lakeMat);
-    lake.rotation.x = -Math.PI / 2;
-    lake.position.set(0.5, 10.4, 4.0);
-    station0Group.add(lake);
-    animatedMaterials.push(lakeMat);
+    // 5. Turquoise water — a river that widens into a pond at the heart of
+    //    the isle. (The old flat CircleGeometry "lake" sat 0.3 units *below*
+    //    the island's grass surface, so it never rendered at all: the only
+    //    water ever visible was the stream tube. It is now one ribbon with a
+    //    bulge in the middle, so spring → pond → stream → waterfall reads as
+    //    a single continuous body of water.)
+    const waterSurfaceY = 10.80;
 
     // 6. Cascading Stylized Waterfall into the Cloud Sea Below
+    /* A waterfall is a ribbon, not a pipe. A TubeGeometry puts the flow UV
+       around the circumference, so this shader was scrolling water sideways
+       and the octagonal tube read as a blue plastic sheet in the hero shot.
+       This builds a real strip: it follows the fall curve, widens as it
+       drops, and carries UVs the way the shader expects them (x across,
+       y down the fall). */
+    function makeWaterRibbon(curve, samples, widthAt, opts = {}) {
+      const pos = [], uv = [], idx = [];
+      const p = new T.Vector3(), tan = new T.Vector3(), side = new T.Vector3();
+      const up = opts.up || new T.Vector3(0, 1, 0);
+      for (let i = 0; i <= samples; i++) {
+        const t = i / samples;
+        curve.getPointAt(t, p);
+        curve.getTangentAt(t, tan);
+        side.crossVectors(tan, up);
+        if (side.lengthSq() < 1e-6) side.set(1, 0, 0); else side.normalize();
+        const w = widthAt(t) * 0.5;
+        pos.push(p.x - side.x * w, p.y - side.y * w, p.z - side.z * w);
+        pos.push(p.x + side.x * w, p.y + side.y * w, p.z + side.z * w);
+        uv.push(0, t, 1, t);
+      }
+      for (let i = 0; i < samples; i++) {
+        const a = i * 2;
+        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      const g = new T.BufferGeometry();
+      g.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+      g.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
+    }
+
     const waterfallCurve = new T.QuadraticBezierCurve3(
-      new T.Vector3(0, 10.3, 14.5),  // Lake lip
-      new T.Vector3(0, 1.0, 17.5),   // Plunge curve
-      new T.Vector3(0, -52.0, 20.0)  // Cloud sea plunge
+      new T.Vector3(0, 10.3, 14.2),  // Lake lip
+      new T.Vector3(0.4, 2.0, 17.6), // Plunge curve
+      new T.Vector3(-0.6, -46.0, 20.5) // Cloud sea plunge
     );
-    const wfTubing = new T.TubeGeometry(waterfallCurve, 28, 4.2, 8, false);
+    const wfTubing = makeWaterRibbon(waterfallCurve, 48, (t) => 3.1 + t * 5.4);
 
     waterfallMat = new T.ShaderMaterial({
       transparent: true,
@@ -3164,9 +3167,10 @@
           col += streak * uFoamColor * 0.35;
           col += glint * uGlintColor * 1.6;
 
-          float alpha = mix(0.72, 0.96, clamp(flow + streak, 0.0, 1.0));
-          alpha = max(alpha, max(lipFoam, baseFoam) * 0.9);
-          alpha *= smoothstep(1.02, 0.9, vUv.y); // fade at the very bottom seam
+          float alpha = mix(0.55, 0.92, clamp(flow + streak, 0.0, 1.0));
+          alpha = max(alpha, max(lipFoam, baseFoam) * 0.85);
+          alpha *= smoothstep(1.02, 0.88, vUv.y); // dissolve into the plunge pool
+          alpha *= smoothstep(0.0, 0.04, vUv.y);  // never cut hard at the lip
 
           gl_FragColor = vec4(col, alpha);
         }
@@ -3186,28 +3190,31 @@
       new T.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9, flatShading: true })
     );
     springRing.rotation.x = -Math.PI / 2;
-    springRing.position.set(0.5, 10.45, -6.2);
+    springRing.position.set(0.5, waterSurfaceY + 0.01, -6.2);
     springRing.castShadow = true;
     springRing.receiveShadow = true;
     station0Group.add(springRing);
 
     // The jet: a slim ribbon of water arcing out of the spring into the lake
     const springJetCurve = new T.QuadraticBezierCurve3(
-      new T.Vector3(0.5, 11.0, -6.2),
+      new T.Vector3(0.5, waterSurfaceY + 0.55, -6.2),
       new T.Vector3(2.6, 13.6, -2.6),
-      new T.Vector3(1.6, 10.7, 0.8)
+      new T.Vector3(1.6, waterSurfaceY + 0.2, 0.8)
     );
     const springJet = new T.Mesh(new T.TubeGeometry(springJetCurve, 20, 0.4, 8, false), waterfallMat);
     station0Group.add(springJet);
 
     // Shallow stream crossing the lake: spring → falls lip (same flowing skin)
     const streamCurve = new T.CatmullRomCurve3([
-      new T.Vector3(0.8, 10.5, -5.4),
-      new T.Vector3(0.2, 10.48, -1.0),
-      new T.Vector3(-0.2, 10.46, 6.0),
-      new T.Vector3(0.0, 10.44, 13.6),
+      new T.Vector3(0.8, waterSurfaceY + 0.02, -5.4),
+      new T.Vector3(0.2, waterSurfaceY + 0.02, -1.0),
+      new T.Vector3(-0.2, waterSurfaceY + 0.02, 6.0),
+      new T.Vector3(0.0, waterSurfaceY + 0.02, 13.4),
     ]);
-    const stream = new T.Mesh(new T.TubeGeometry(streamCurve, 24, 0.85, 8, false), waterfallMat);
+    const stream = new T.Mesh(
+      makeWaterRibbon(streamCurve, 56, (t) => 2.4 + Math.sin(t * Math.PI) * 7.6),
+      waterfallMat
+    );
     station0Group.add(stream);
 
     // Expanding ripple rings at both ends of the story
@@ -3222,7 +3229,7 @@
       for (let r = 0; r < spot.n; r++) {
         const ring = new T.Mesh(new T.TorusGeometry(1, 0.07, 6, 28), rippleMat());
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(spot.x, 10.52, spot.z);
+        ring.position.set(spot.x, waterSurfaceY + 0.03, spot.z);
         station0Group.add(ring);
         window.__springRipples.push({ mesh: ring, phase: r / spot.n, speed: 0.34 });
       }
@@ -4240,19 +4247,22 @@
     clickTargets.push({ mesh: b4.gem, stationIdx: 4, name: "Cosmic Portal", type: "isle" });
 
     // 6 Magnificent Swimming Celestial Sky-Koi Fish ("fishes in the air")
+    // Orbits are deliberately placed BEHIND each station and above it, so a
+    // koi can never swim through the camera and fill the frame with an
+    // 11-unit fish body (that was the amber blob across the carnival view).
     const fishConfigs = [
       // Hero Realm — sapphire koi, rose silk
-      { color: 0x38bdf8, fin: 0xf472b6, cx: 20, cz: -30, baseY: 30, rx: 70, rz: 60, speed: 0.0012, offset: 0, scale: 1.4 },
+      { color: 0x38bdf8, fin: 0xf472b6, cx: 12, cz: -42, baseY: 36, rx: 42, rz: 34, speed: 0.0012, offset: 0, scale: 1.05 },
       // Carnival Realm — amber koi, violet silk
-      { color: 0xf59e0b, fin: 0x8b5cf6, cx: 143, cz: -95, baseY: 40, rx: 60, rz: 50, speed: 0.0010, offset: 1.8, scale: 1.6 },
+      { color: 0xf59e0b, fin: 0x8b5cf6, cx: 152, cz: -128, baseY: 48, rx: 40, rz: 34, speed: 0.0010, offset: 1.8, scale: 1.1 },
       // Archipelago Realm — emerald koi, gold silk
-      { color: 0x10b981, fin: 0xfbbf24, cx: -133, cz: -90, baseY: 32, rx: 55, rz: 46, speed: 0.0013, offset: 3.2, scale: 1.3 },
+      { color: 0x10b981, fin: 0xfbbf24, cx: -115, cz: -119, baseY: 40, rx: 42, rz: 34, speed: 0.0013, offset: 3.2, scale: 1.0 },
       // Constellation Realm — rose koi, cyan silk
-      { color: 0xec4899, fin: 0x67e8f9, cx: -68, cz: -235, baseY: 78, rx: 75, rz: 60, speed: 0.0008, offset: 4.5, scale: 1.8 },
+      { color: 0xec4899, fin: 0x67e8f9, cx: -55, cz: -272, baseY: 30, rx: 40, rz: 32, speed: 0.0008, offset: 4.5, scale: 1.1 },
       // Portal Gateway — amethyst koi, silver silk
-      { color: 0x8b5cf6, fin: 0xe2e8f0, cx: 9, cz: -355, baseY: 50, rx: 62, rz: 50, speed: 0.0011, offset: 2.4, scale: 1.5 },
+      { color: 0x8b5cf6, fin: 0xe2e8f0, cx: 5, cz: -414, baseY: 46, rx: 38, rz: 30, speed: 0.0011, offset: 2.4, scale: 1.0 },
       // Inter-Realm Great Cosmic Voyager — turquoise koi, coral silk
-      { color: 0x06b6d4, fin: 0xfb7185, cx: 0, cz: -175, baseY: 68, rx: 145, rz: 118, speed: 0.0006, offset: 5.1, scale: 2.0 },
+      { color: 0x06b6d4, fin: 0xfb7185, cx: 0, cz: -175, baseY: 92, rx: 150, rz: 120, speed: 0.0006, offset: 5.1, scale: 1.25 },
     ];
     fishConfigs.forEach((cfg) => {
       const fish = createSkyFish(cfg.color, cfg.scale, cfg.fin);
@@ -4592,18 +4602,23 @@
   /* ── 7. CINEMATIC CAMERA CHOREOGRAPHY ──────────────────────────────── */
 
   // 5 Station Camera Viewpoints [pos, target]
+  // Framing rule: the camera sits far enough from each station's bounding
+  // sphere that the whole composition reads (≈2× the bound radius), then the
+  // zoom HUD lets a visitor move in. Stations 03/04 used to sit INSIDE their
+  // own star field / portal (bound radius 55.4 / 31.8 vs a 52 / 30 camera
+  // distance) which is why those two views looked broken.
   const CAMERA_WAYPOINTS = [
     // 00 — ISLE: Intimate establishing view — the whole isle reads at first
     // glance (cottage, Sakura, spring, waterfall), companions on the horizon
-    { pos: new T.Vector3(-14, 22, 46),   target: new T.Vector3(3, 10.5, 1) },
+    { pos: new T.Vector3(-14, 22, 46),  target: new T.Vector3(3, 10.5, 1) },
     // 01 — OBSERVATORY: Close enough to count the gondolas, wheel fully framed
     { pos: new T.Vector3(94, 52, -18),  target: new T.Vector3(141, 15, -97) },
     // 02 — ARCHIPELAGO: Golden-hour view across the bridge chain, near & readable
-    { pos: new T.Vector3(-178, 19, -41), target: new T.Vector3(-130, 4, -92) },
-    // 03 — CONSTELLATION: Drifting among the glowing stars, up close
-    { pos: new T.Vector3(-55, 73, -183), target: new T.Vector3(-55, 68, -235) },
-    // 04 — PORTAL: Eye-level with the gate and its guardians
-    { pos: new T.Vector3(5, 34, -330),   target: new T.Vector3(5, 28, -360) },
+    { pos: new T.Vector3(-196, 34, -26), target: new T.Vector3(-135, 9, -88) },
+    // 03 — CONSTELLATION: outside the star field, level with its heart
+    { pos: new T.Vector3(-55, 98, -128), target: new T.Vector3(-54.5, 62, -235.5) },
+    // 04 — PORTAL: the gate, both guardians and the steps in one frame
+    { pos: new T.Vector3(5, 44, -300),  target: new T.Vector3(5, 36, -360) },
   ];
 
   let currentStationProgress = FORCED_STATION !== null ? FORCED_STATION : 0;
@@ -4903,7 +4918,13 @@
 
     // Base offset from lookAt target to camera waypoint
     const baseOffset = new T.Vector3().subVectors(currentPos, currentLookAt);
-    const dist = baseOffset.length() * zoomFactor;
+
+    // Portrait phones have a much narrower horizontal FOV, so the same
+    // waypoint would crop the isles left and right — pull back instead.
+    const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+    const viewScale = aspect < 1 ? 1 + (1 - aspect) * 0.78 : 1;
+
+    const dist = baseOffset.length() * zoomFactor * viewScale;
 
     // Convert to spherical coords and apply 360° free orbit yaw and clamped pitch
     const baseTheta = Math.atan2(baseOffset.x, baseOffset.z);

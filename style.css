@@ -377,11 +377,6 @@ body.has-modal-open .station-expand-pill {
   pointer-events: none !important;
   transform: translate(-50%, 20px) !important;
 }
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
-  white-space: nowrap;
-}
 .station-expand-pill.active {
   opacity: 1 !important;
   visibility: visible !important;
@@ -909,7 +904,7 @@ body.cinema-mode .zoom-hud {
     font-size: 12px;
   }
   .station-expand-pill {
-    bottom: 48px !important;
+    bottom: 58px !important;
     max-width: calc(100vw - 24px);
     padding: 6px 12px;
     font-size: 11px;
@@ -922,6 +917,35 @@ body.cinema-mode .zoom-hud {
     font-size: 10px;
     padding: 4px 10px;
     max-width: 92vw;
+  }
+  #orbit-hint { bottom: 104px; }
+}
+
+/* ── phones: one-line nav, no HUD pile-up ───────────────────── */
+@media (max-width: 560px) {
+  .nav-inner { gap: 8px; padding: 0 10px; }
+  .nav-actions { gap: 6px; }
+  .logo-name { font-size: 15px; letter-spacing: 1px; }
+  .audio-label, .cinema-label, .nav-gh { display: none; }
+  .nav-audio, .nav-cinema { padding: 6px 9px; gap: 0; font-size: 13px; }
+  .nav-cmdk { display: none; }
+  .station-expand-pill {
+    bottom: 56px !important;
+    padding: 6px 10px;
+    gap: 6px;
+    font-size: 10.5px;
+  }
+  .station-expand-pill .pill-act { display: none; }
+  .station-expand-pill .pill-name { font-size: 10.5px; letter-spacing: 0.06em; }
+  .minimap-card { top: calc(var(--nav-h) + 8px); left: 10px; width: 150px; }
+  .minimap-card #minimap-canvas { width: 150px; height: 102px; }
+  .zoom-hud { bottom: 10px; right: 10px; }
+  #orbit-hint {
+    bottom: 100px;
+    font-size: 9.5px;
+    padding: 5px 10px;
+    max-width: calc(100vw - 20px);
+    text-align: center;
   }
 }
 
@@ -942,3 +966,23 @@ body.cinema-mode .zoom-hud {
 .static-render *::after { animation: none !important; transition: none !important; }
 .static-render .af-bar i { transform: scaleX(1) !important; }
 .static-render .reveal { opacity: 1 !important; transform: none !important; }
+
+/* ── no-WebGL fallback (?static too) ────────────────────────── */
+html.no-world body {
+  background:
+    radial-gradient(1200px 600px at 70% -10%, #134e7a 0%, transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, #4c1d95 0%, transparent 55%),
+    #060a18;
+}
+html.no-world #world,
+html.no-world .vignette,
+html.no-world .journey,
+html.no-world #orbit-hint,
+html.no-world #cinema-hud,
+html.no-world #world-zoom-hud,
+html.no-world .minimap-card,
+html.no-world .scroll-cue { display: none !important; }
+html.no-world main { pointer-events: auto; }
+html.no-world .station { min-height: auto; padding-top: 96px; padding-bottom: 48px; }
+html.no-world .station-expand-pill { position: static !important; transform: none !important; opacity: 1; visibility: visible; pointer-events: auto; margin-top: 8px; }
+html.no-world .reveal { opacity: 1 !important; transform: none !important; }
