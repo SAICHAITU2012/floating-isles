@@ -2989,6 +2989,16 @@
     const hangGarden = new T.Group();
     station0Group.add(hangGarden);
 
+    // ── TEMPORARY X-RAY MODE ──────────────────────────────────────────
+    // REVERT THIS COMMIT to restore the island's rocky underside:
+    //   git revert <this commit's sha>
+    // Hides the lower brown rock so the interior can be inspected:
+    heroIslandSlot.visible = false;  // the GLB rock mass + its 6 baked-in trees
+    rockTier1.visible = false;       // stepped rock shelf 1
+    rockTier2.visible = false;       // stepped rock shelf 2
+    hangGarden.visible = false;      // crystals / vines / shard-islets clinging to the rock
+    // (the green grass top stays; the under-isle hut + waterfall remain)
+
     const vineLeafMat = new T.MeshStandardMaterial({ color: 0x6ee7a0, roughness: 0.7, emissive: 0x166534, emissiveIntensity: 0.9 });
     applyGhibliToon(vineLeafMat, { shadowTint: new T.Color(0x14532d), rimColor: new T.Color(0xbbf7d0) });
     const vineBloomMat = new T.MeshStandardMaterial({
