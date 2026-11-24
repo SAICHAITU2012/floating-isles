@@ -75,7 +75,12 @@
   let composer = null;
   let bloomPass = null;
   let gradePass = null;
-  if (typeof T.EffectComposer !== "undefined" && typeof T.RenderPass !== "undefined" && typeof T.UnrealBloomPass !== "undefined") {
+  // Phones skip the bloom + grade chain entirely: it is the single most
+  // expensive thing on a mobile GPU and the emissive materials still read
+  // beautifully without it. A struggling desktop can also drop it later
+  // (see degradeQuality below).
+  let usePostFX = !MOBILE();
+  if (usePostFX && typeof T.EffectComposer !== "undefined" && typeof T.RenderPass !== "undefined" && typeof T.UnrealBloomPass !== "undefined") {
     composer = new T.EffectComposer(renderer);
     const renderPass = new T.RenderPass(scene, camera);
     composer.addPass(renderPass);
@@ -1473,8 +1478,8 @@
     const hemMat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
     const hem = new T.Mesh(hemGeo, hemMat);
     if (isSeated) {
-      hem.rotation.x = Math.PI / 2.5;
-      hem.position.set(0, 0.18, 0.08);
+      hem.rotation.x = Math.PI / 2;      // flat ring — a tilted hem reads as a leaning frock
+      hem.position.set(0, 0.16, 0.08);
       hem.scale.set(1.1, 1, 1.16);
     } else {
       hem.rotation.x = Math.PI / 2;
@@ -1489,10 +1494,10 @@
       const shoeMat = new T.MeshStandardMaterial({ color: accentColor, roughness: 0.5 });
       [-0.24, 0.24].forEach((lx) => {
         const leg = new T.Mesh(legGeo, legMat);
-        leg.position.set(lx, 0.0, 0.95);
+        leg.position.set(lx, -0.02, 0.10);
         group.add(leg);
         const shoe = new T.Mesh(new T.BoxGeometry(0.24, 0.16, 0.35), shoeMat);
-        shoe.position.set(lx, -0.68, 1.05);
+        shoe.position.set(lx, -0.70, 0.16);
         group.add(shoe);
       });
     }
@@ -1668,22 +1673,38 @@
     const sleeveMat = new T.MeshStandardMaterial({ color: dressColor, roughness: 0.6 });
 
     // Left Arm (holding item or resting on table) — with its hand
+    // Left arm hangs from a SHOULDER PIVOT. Moving a bare cylinder outward
+    // (the old fix for the buried hand) opened a visible gap at the shoulder,
+    // so the arm and hand now swing from the joint itself and a deltoid cap
+    // hides the seam. Either way the hand clears the flared skirt.
+    const armLPivot = new T.Group();
+    armLPivot.position.set(-0.55, 2.28 + yOff, 0.06);
+    const shoulderL = new T.Mesh(new T.SphereGeometry(0.135, 10, 10), sleeveMat);
+    armLPivot.add(shoulderL);
+
     const armL = new T.Mesh(armGeo, sleeveMat);
+    armL.position.set(0, -0.40, 0);
+    armLPivot.add(armL);
+
+    const handL = new T.Mesh(new T.SphereGeometry(0.125, 10, 10), skinMat);
+    handL.position.set(0, -0.85, 0);
+    handL.scale.set(1, 1.15, 1);
+    armLPivot.add(handL);
+
     if (isSeated) {
-      armL.position.set(-0.58, 1.25 + yOff, 0.15);
-      armL.rotation.set(-0.2, 0, 0.15);
+      // resting forward on her lap, in front of the frock, clearly visible
+      armLPivot.rotation.set(-0.75, 0, -0.02);
     } else {
-      armL.position.set(-0.62, 1.85, 0.05);
-      armL.rotation.set(0.1, 0, 0.15);
+      // hanging just outside the skirt silhouette
+      armLPivot.rotation.set(-0.10, 0, -0.26);
     }
-    const handL = new T.Mesh(new T.SphereGeometry(0.11, 8, 8), skinMat);
-    handL.position.set(0, -0.47, 0);
-    armL.add(handL);
-    group.add(armL);
+    group.add(armLPivot);
 
     // Right Arm (Posed for waving or resting)
     const waveArmPivot = new T.Group();
     waveArmPivot.position.set(0.62, 2.30 + yOff, 0.05);
+    const shoulderR = new T.Mesh(new T.SphereGeometry(0.135, 10, 10), sleeveMat);
+    waveArmPivot.add(shoulderR);
     const armR = new T.Mesh(armGeo, sleeveMat);
     armR.position.set(0, -0.35, 0);
 
@@ -1705,28 +1726,41 @@
     // Magic Wand — held in the waving hand: gilded shaft, glowing star
     // tip in her accent colour, twin sparkle slivers that spin forever
     const wandGroup = new T.Group();
-    wandGroup.position.set(0, -0.86, 0.05);
+    // The wand used to point along the pivot's +Y, which is the *downward*
+    // (elbow) direction — so the star hung below her hand and the plain butt
+    // of the shaft stuck up past her fist. Flipping it about Z makes the star
+    // continue the line of her raised arm, and the grip sits in her hand.
+    wandGroup.position.set(0, -0.78, 0.04);
+    wandGroup.rotation.z = Math.PI;
     const wandShaft = new T.Mesh(
-      new T.CylinderGeometry(0.028, 0.04, 1.5, 6),
+      new T.CylinderGeometry(0.032, 0.045, 1.2, 6),
       new T.MeshStandardMaterial({ color: 0xd97706, metalness: 0.7, roughness: 0.3 })
     );
-    wandShaft.position.set(0, 0.4, 0);
+    wandShaft.position.set(0, 0.46, 0);
     wandGroup.add(wandShaft);
+    // gold collar where her fingers close on the shaft
+    const wandGrip = new T.Mesh(
+      new T.TorusGeometry(0.052, 0.017, 6, 12),
+      new T.MeshStandardMaterial({ color: 0xfcd34d, metalness: 0.9, roughness: 0.25 })
+    );
+    wandGrip.rotation.x = Math.PI / 2;
+    wandGrip.position.set(0, 0.05, 0);
+    wandGroup.add(wandGrip);
     const wandTipMat = new T.MeshStandardMaterial({
       color: accentColor, emissive: accentColor, emissiveIntensity: 3.0, roughness: 0.15,
     });
     const wandTip = new T.Mesh(new T.OctahedronGeometry(0.17, 0), wandTipMat);
-    wandTip.position.set(0, 1.22, 0);
+    wandTip.position.set(0, 1.10, 0);
     wandGroup.add(wandTip);
     const sparkMat = new T.MeshBasicMaterial({ color: 0xfffbeb, transparent: true, opacity: 0.9 });
     const sparkA = new T.Mesh(new T.BoxGeometry(0.34, 0.045, 0.045), sparkMat);
-    sparkA.position.y = 1.22;
+    sparkA.position.y = 1.10;
     wandGroup.add(sparkA);
     const sparkB = new T.Mesh(new T.BoxGeometry(0.045, 0.34, 0.045), sparkMat);
-    sparkB.position.y = 1.22;
+    sparkB.position.y = 1.10;
     wandGroup.add(sparkB);
     const sparkC = new T.Mesh(new T.BoxGeometry(0.045, 0.045, 0.34), sparkMat);
-    sparkC.position.y = 1.22;
+    sparkC.position.y = 1.10;
     wandGroup.add(sparkC);
     // star tips spin gently forever (register once per girl)
     rotatingElements.push({ obj: wandGroup, speedY: 0.06 });
@@ -5634,18 +5668,9 @@
     clickTargets.push({ mesh: girl0.hitbox, stationIdx: 0, name: "✦ Meet Sakura — Click for Isle Dossier", type: "guide" });
 
     // Sakura's flower garden & companion cat on the hero isle dock
-    // knees + shoes so a seated girl reads as a person, not a cone
-    [-0.24, 0.24].forEach((kx) => {
-      const knee = new T.Mesh(new T.CylinderGeometry(0.13, 0.11, 0.62, 7),
-        new T.MeshStandardMaterial({ color: 0xffdfc8, roughness: 0.7 }));
-      knee.position.set(kx, 0.62, 0.62);
-      knee.rotation.x = Math.PI * 0.42;
-      girl0.group.add(knee);
-      const shoe = new T.Mesh(new T.BoxGeometry(0.22, 0.14, 0.34),
-        new T.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.5 }));
-      shoe.position.set(kx, 0.5, 0.9);
-      girl0.group.add(shoe);
-    });
+    // (the old extra "knees + shoes" pair sat at z 0.62–0.9, i.e. *through* the
+    //  front of her frock, where they read as legs poking out of the dress.
+    //  The seated legs inside createGuideGirl already do this job, correctly.)
 
     const heroFlowers = createFlowerPatch(3.2, 20);
     heroFlowers.position.set(4.2, 9.6, 6.4);
@@ -5703,6 +5728,7 @@
     girl4.group.rotation.y = -0.6;
     station4Group.add(girl4.group);
     guideGirls.push(girl4);
+    window.__guideGirls = guideGirls;
     clickTargets.push({ mesh: girl4.hitbox, stationIdx: 4, name: "✦ Meet Rei — Click for Portal Dossier", type: "guide" });
 
     // Store for animation
@@ -6208,7 +6234,7 @@
   const ADAPT = {
     cap: Math.min(window.devicePixelRatio || 1, MOBILE() ? 1.5 : 2.0),
     floor: 1.0,
-    cur: 0, winStart: 0, frameMs: [], lastChange: 0,
+    cur: 0, winStart: 0, frameMs: [], lastChange: 0, qualityStep: 0,
   };
   ADAPT.cur = ADAPT.cap;
   function setDpr(v) {
@@ -6220,6 +6246,40 @@
   }
   setDpr(ADAPT.cur);
   window.__worldQuality = () => ADAPT.cur;
+
+  /* One-way visual ladder for weak GPUs. If we are already at the resolution
+     floor and STILL missing frames, give up the extras in order — post-fx,
+     shadows, then the small decorative particle clouds. The island, the
+     girls, the story and every interaction stay; only sparkle is traded for
+     smoothness, and it never turns itself back on mid-session (no flicker). */
+  function degradeQuality() {
+    if (ADAPT.qualityStep === 0) {
+      ADAPT.qualityStep = 1;
+      if (usePostFX) {
+        usePostFX = false;
+        composer = null;
+      }
+      renderer.shadowMap.enabled = false;
+      scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+      console.info("[world] quality: post-fx + shadows off (device under load)");
+    } else if (ADAPT.qualityStep === 1) {
+      ADAPT.qualityStep = 2;
+      ["__bridgeMotes", "__streamPetals", "__springDrops", "__guideSparkles"].forEach((k) => {
+        const g = window[k];
+        if (Array.isArray(g)) {
+          g.forEach((entry) => {
+            const o = entry && entry.obj ? entry.obj : entry;
+            if (o && o.visible !== undefined) o.visible = false;
+          });
+        } else if (g && g.visible !== undefined) {
+          g.visible = false;
+        }
+      });
+      console.info("[world] quality: decorative particles off");
+    }
+  }
+  window.__degradeQuality = degradeQuality;
+  window.__qualityStep = () => ADAPT.qualityStep;
 
   function adaptiveDprTick(nowMs, frameDeltaMs) {
     if (frameDeltaMs > 0 && frameDeltaMs < 250) { // ignore tab-restore spikes
@@ -6235,6 +6295,10 @@
 
     if (median > 23 && ADAPT.cur > ADAPT.floor) {
       setDpr(Math.max(ADAPT.floor, ADAPT.cur - 0.25));
+      ADAPT.lastChange = nowMs;
+    } else if (median > 27 && ADAPT.cur <= ADAPT.floor && ADAPT.qualityStep < 2) {
+      // already at the resolution floor and still slow → trade extras
+      degradeQuality();
       ADAPT.lastChange = nowMs;
     } else if (median < 13 && ADAPT.cur < ADAPT.cap && nowMs - ADAPT.lastChange > 8000) {
       setDpr(Math.min(ADAPT.cap, ADAPT.cur + 0.25));
@@ -6828,7 +6892,7 @@
     }
 
     // Render via composer or fallback renderer
-    if (composer) {
+    if (usePostFX && composer) {
       composer.render();
     } else {
       renderer.render(scene, camera);

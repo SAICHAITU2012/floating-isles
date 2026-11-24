@@ -250,8 +250,9 @@ a { color: inherit; text-decoration: none; }
 }
 .journey-stops { list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
 /* dual-tone shadow keeps the rail readable over both noon-cyan and golden-hour skies */
-.journey-stops li { font-size: 10px; color: var(--faint); letter-spacing: 0.12em; transition: color 0.3s;
-  text-shadow: 0 1px 2px rgba(8, 15, 35, 0.85), 0 0 6px rgba(8, 15, 35, 0.6); }
+.journey-stops li { font-size: 10px; color: rgba(226, 240, 255, 0.82); letter-spacing: 0.12em;
+  font-weight: 500; transition: color 0.3s;
+  text-shadow: 0 1px 2px rgba(8, 15, 35, 0.95), 0 0 8px rgba(8, 15, 35, 0.85), 0 0 18px rgba(8, 15, 35, 0.6); }
 .journey-stops li.near { color: #7dd3fc; }
 
 /* ── stations + panels ──────────────────────────────────────── */
@@ -940,6 +941,9 @@ body.cinema-mode .zoom-hud {
   .minimap-card { top: calc(var(--nav-h) + 8px); left: 10px; width: 150px; }
   .minimap-card #minimap-canvas { width: 150px; height: 102px; }
   .zoom-hud { bottom: 10px; right: 10px; }
+  /* the 'descend' cue used to sit under the zoom cluster on phones */
+  .scroll-cue { bottom: 108px; left: 16px; transform: none; align-items: flex-start; }
+  .scroll-cue .cue-line { height: 26px; }
   #orbit-hint {
     bottom: 100px;
     font-size: 9.5px;

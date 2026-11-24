@@ -211,21 +211,21 @@
   // Six-chord "wonder" progression, roots in semitones from C, chord tones
   // above the root. Warm, open, unashamedly hopeful.
   const PROGRESSION = [
-    { root: 0,  tones: [0, 4, 7, 11, 14] },   // Cmaj9 — sunrise
-    { root: 7,  tones: [0, 4, 7, 10, 14] },   // G6/9 — open sky
-    { root: -3, tones: [0, 3, 7, 10, 14] },   // Am9 — nostagic air
-    { root: 5,  tones: [0, 4, 7, 11, 16] },   // Fmaj7#11 — lift
-    { root: -5, tones: [0, 3, 7, 10, 14] },   // Dm9 — soft ache
-    { root: 2,  tones: [0, 4, 7, 11, 15] },   // Dmaj7 — bright turn home
+    { root: 0,  tones: [0, 4, 7, 11, 14] },   // Cmaj9 — sunrise, wide open
+    { root: 5,  tones: [0, 4, 7, 11, 14] },   // Fmaj9 — warm, lifted
+    { root: 7,  tones: [0, 4, 7, 9, 14] },    // G6/9 — playful, bright
+    { root: 2,  tones: [0, 4, 7, 11, 14] },   // Dmaj9-ish — a happy step up
+    { root: -3, tones: [0, 4, 7, 11, 14] },   // A(add9) as a soft relative minor lift
+    { root: 5,  tones: [0, 4, 7, 11, 16] },   // Fmaj7#11 — shimmer, then home
   ];
 
   // Each realm gets its own colour: transposition and how busy the melody is.
   const MOODS = {
-    0: { offset: 0,  sparse: 1.0,  pad: 0.05,   bells: 0.055 }, // floating isle
-    1: { offset: 2,  sparse: 1.15, pad: 0.045,  bells: 0.06  }, // observatory / carnival
-    2: { offset: -2, sparse: 0.95, pad: 0.05,   bells: 0.05  }, // archipelago
-    3: { offset: 7,  sparse: 0.7,  pad: 0.038,  bells: 0.062 }, // constellation — high & airy
-    4: { offset: -5, sparse: 0.8,  pad: 0.055,  bells: 0.045 }, // portal — low & mysterious
+    0: { offset: 0,  sparse: 1.0,  pad: 0.05,  bells: 0.05,  tempo: 1.0  }, // hero isle — calm, happy
+    1: { offset: 2,  sparse: 1.1,  pad: 0.046, bells: 0.052, tempo: 1.08 }, // observatory — a little brighter
+    2: { offset: 5,  sparse: 1.05, pad: 0.048, bells: 0.05,  tempo: 1.04 }, // archipelago — sunny, open
+    3: { offset: 7,  sparse: 0.8,  pad: 0.04,  bells: 0.056, tempo: 0.92 }, // constellation — high, dreamy
+    4: { offset: 3,  sparse: 0.9,  pad: 0.046, bells: 0.048, tempo: 0.95 }, // portal — soft wonder
   };
 
   function makeReverbIR(seconds = 3.4, decay = 2.6) {
@@ -392,6 +392,32 @@
     } catch (e) {}
   }
 
+  // Music-box tine: pure, small, and warm — the joyful little melody line.
+  function boxVoice(freq, time, duration = 2.4, velocity = 0.05) {
+    if (!audioCtx) return;
+    try {
+      const o = audioCtx.createOscillator();
+      const o2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(freq, time);
+      o2.type = "sine";
+      o2.frequency.setValueAtTime(freq * 4.01, time);
+      const g2 = audioCtx.createGain();
+      g2.gain.setValueAtTime(velocity * 0.22, time);
+      g2.gain.exponentialRampToValueAtTime(0.0001, time + duration * 0.5);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(velocity, time + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+      o.connect(g); o2.connect(g2); g2.connect(g);
+      g.connect(masterGain);
+      if (reverbIn) g.connect(reverbIn);
+      if (delayIn) g.connect(delayIn);
+      o.start(time); o2.start(time);
+      o.stop(time + duration); o2.stop(time + duration);
+    } catch (e) {}
+  }
+
   // Soft plucked string for the arpeggios.
   function pluckVoice(freq, time, duration = 2.6, velocity = 0.045) {
     if (!audioCtx) return;
@@ -429,7 +455,7 @@
       o.type = "sine";
       o.frequency.setValueAtTime(freq, time);
       g.gain.setValueAtTime(0, time);
-      g.gain.linearRampToValueAtTime(0.045, time + 2.0);
+      g.gain.linearRampToValueAtTime(0.034, time + 2.2);
       g.gain.exponentialRampToValueAtTime(0.0001, time + duration);
       o.connect(g); g.connect(masterGain);
       o.start(time); o.stop(time + duration);
@@ -459,26 +485,36 @@
     padVoice(midiToFreq(chordMidis[3]), now + 0.45, 7.0, cfg.pad * 0.45);
     subVoice(bass / 2, now, 9.5);
 
-    // 2. arpeggio — chord tones plus the ninth, gently humanised
+    // 2. arpeggio — chord tones plus the ninth, unhurried and humanised
     const arpPool = [...chordMidis, chordMidis[0] + 12, chordMidis[2] + 12];
-    const arpCount = Math.max(3, Math.round(5 * cfg.sparse));
+    const arpCount = Math.max(3, Math.round(4 * cfg.sparse));
     for (let i = 0; i < arpCount; i++) {
       const f = midiToFreq(arpPool[(i * 2 + chordIdx) % arpPool.length]);
-      const t = now + 0.4 + i * (0.62 + Math.random() * 0.16);
-      pluckVoice(f, t, 2.8, cfg.bells);
+      const t = now + 0.5 + i * (0.86 + Math.random() * 0.14);
+      pluckVoice(f, t, 2.8, cfg.bells * 0.85);
     }
 
-    // 3. a bell melody that drifts over the top
-    if (Math.random() < 0.85) {
-      const steps = [2, 3, 4, 4, 3, 2];
-      const n = steps[chordIdx % steps.length];
-      bellVoice(midiToFreq(chordMidis[n] + 12), now + 1.4 + Math.random() * 1.2, 3.6, cfg.bells * 0.85);
-    }
-    if (Math.random() < 0.4) {
-      bellVoice(midiToFreq(chordMidis[1] + 24), now + 4.0 + Math.random() * 1.6, 4.2, cfg.bells * 0.5);
+    // 3. a music-box melody in the major pentatonic — simple, innocent, happy.
+    //    Degrees 0 2 4 7 9 of the key never clash with any chord in the set.
+    const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
+    const phraseShapes = [
+      [0, 2, 4, 2, 0], [4, 7, 9, 7, 4], [0, 4, 7, 12, 7],
+      [7, 9, 12, 9, 7], [0, 2, 7, 4, 2], [12, 9, 7, 4, 0],
+    ];
+    const shape = phraseShapes[chordIdx % phraseShapes.length];
+    const keyRoot = 72 + moodOffset;                 // C5 area
+    shape.forEach((deg, i) => {
+      const f = midiToFreq(keyRoot + PENTA[deg]);
+      const t = now + 0.9 + i * (0.92 * cfg.tempo) + Math.random() * 0.06;
+      boxVoice(f, t, 2.3, cfg.bells * 0.9);
+    });
+
+    // 4. one soft bell halo above the melody, now and then
+    if (Math.random() < 0.55) {
+      bellVoice(midiToFreq(chordMidis[2] + 24), now + 3.6 + Math.random() * 1.4, 4.4, cfg.bells * 0.4);
     }
 
-    musicTimer = setTimeout(scheduleNextPhrase, 6600);
+    musicTimer = setTimeout(scheduleNextPhrase, 8400);
   }
 
   function setMood(idx) {
@@ -509,7 +545,7 @@
 
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 3.0);
+    masterGain.gain.linearRampToValueAtTime(0.42, audioCtx.currentTime + 3.4);
     if (windGain) windGain.gain.linearRampToValueAtTime(mood === 3 ? 0.05 : 0.03, audioCtx.currentTime + 4.0);
 
     scheduleNextPhrase();
