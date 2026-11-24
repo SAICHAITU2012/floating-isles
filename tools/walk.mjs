@@ -173,6 +173,31 @@ const overlayHTML = `
     ${DATA.tech.map(([t, tags]) => `<div style="margin-bottom:12px"><div class="mono" style="font-size:11px;color:#8fa6c9;letter-spacing:.18em;margin-bottom:7px">${t}</div><div>${tags.map((x) => `<span class="chip mono">${x}</span>`).join("")}</div></div>`).join("")}
   </div>
 
+
+  <div id="c-hero" class="glass" style="position:absolute;right:6%;top:13%;width:34%;padding:30px 34px;opacity:0">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <div class="mono" style="font-size:10.5px;letter-spacing:.30em;color:#f9a8d4">✦ ISLE 00</div>
+      <div class="mono" style="font-size:9.5px;letter-spacing:.18em;color:#7f93b5">島 · THE FLOATING ISLES</div>
+    </div>
+    <div style="height:1px;background:rgba(255,255,255,.14);margin:14px 0 16px"></div>
+    <div class="mono" style="font-size:10.5px;letter-spacing:.26em;color:#9fb4d8">AN EXPLORABLE PORTFOLIO</div>
+    <div class="disp" style="font-size:44px;letter-spacing:.02em;color:#fff;margin-top:8px">S. SADHASRI</div>
+    <div class="mono" style="font-size:12px;color:#67e8f9;margin-top:8px;letter-spacing:.12em">▶ agent tooling · web platforms · ML</div>
+    <div style="font-size:14.5px;line-height:1.72;color:#d0ddef;margin-top:16px">
+      Welcome to my sky. The camera carries you across the isles: an <b style="color:#fff;font-weight:600">observatory</b> of who I am,
+      an <b style="color:#fff;font-weight:600">archipelago</b> of everything I've shipped, a
+      <b style="color:#fff;font-weight:600">constellation</b> of what I know, and a <b style="color:#fff;font-weight:600">portal</b> at the end.
+    </div>
+    <div style="display:flex;gap:20px;margin-top:20px;flex-wrap:wrap">
+      <div><div class="mono" style="font-size:22px;color:#fff">13</div><div class="mono" style="font-size:9.5px;letter-spacing:.14em;color:#7f93b5">public repos</div></div>
+      <div><div class="mono" style="font-size:22px;color:#fff">6</div><div class="mono" style="font-size:9.5px;letter-spacing:.14em;color:#7f93b5">missions shipped</div></div>
+      <div><div class="mono" style="font-size:22px;color:#fff">100%</div><div class="mono" style="font-size:9.5px;letter-spacing:.14em;color:#7f93b5">open source</div></div>
+      <div><div class="mono" style="font-size:22px;color:#fff">5</div><div class="mono" style="font-size:9.5px;letter-spacing:.14em;color:#7f93b5">isles to visit</div></div>
+    </div>
+    <div class="mono" style="margin-top:18px;font-size:10.5px;letter-spacing:.16em;color:#8fa6c9">
+      00 hero · 01 archipelago · 02 carnival · 03 stars · 04 portal
+    </div>
+  </div>
   <div id="c-cap" style="position:absolute;left:0;bottom:8.5%;padding:26px 9% 26px 6%;opacity:0;
        background:linear-gradient(90deg, rgba(3,7,17,.86), rgba(3,7,17,.42) 45%, transparent 72%)">
     <div id="cap-n" class="mono" style="font-size:11px;letter-spacing:.42em;color:#67e8f9"></div>
@@ -183,8 +208,11 @@ const overlayHTML = `
   <div id="c-end" style="position:absolute;left:0;right:0;top:29%;padding:6% 0;text-align:center;opacity:0;
        background:radial-gradient(60% 100% at 50% 50%, rgba(2,5,14,.90), rgba(2,5,14,.48) 62%, transparent 84%)">
     <div class="disp" style="font-size:46px;font-weight:300;letter-spacing:.14em;color:#fff">SADHA'S UNIVERSE</div>
-    <div class="mono" style="margin-top:16px;font-size:12px;letter-spacing:.28em;color:#67e8f9">SAICHAITU2012.GITHUB.IO/FLOATING-ISLES</div>
-    <div class="mono" style="margin-top:10px;font-size:11px;letter-spacing:.2em;color:rgba(240,246,255,.82)">GITHUB.COM/SADHASRI697 · 6 MISSIONS · 5 REALMS</div>
+    <div class="mono" style="margin-top:18px;font-size:13px;letter-spacing:.26em;color:#67e8f9">GITHUB.COM/SADHASRI697</div>
+    <div class="mono" style="margin-top:12px;font-size:11px;letter-spacing:.2em;color:rgba(240,246,255,.82)">
+      MY ANIME SHELF · AIR QUALITY · STUDENT WELL-BEING · WEB2SKILL · TELEGRAM BRIDGE · PYTHON SUITE
+    </div>
+    <div class="mono" style="margin-top:10px;font-size:10.5px;letter-spacing:.26em;color:rgba(200,215,240,.62)">6 MISSIONS · 5 REALMS · THREE.JS</div>
   </div>`;
 
 await evaluate(`(() => {
@@ -313,6 +341,7 @@ for (let f = 0; f < TOTAL_FRAMES; f++) {
   // which data card is up?
   const titleOp = fade(t, 1.0, 2.6, 7.4, 9.2);
   const bioOp = fade(t, 52, 54.2, 62.5, 64.5);
+  const heroOp = fade(t, 11.4, 12.9, 20.2, 21.6);
   const techOp = fade(t, 128.5, 131, 135.6, 137.2);
   const endOp = fade(t, 160, 162.5, 168, 169);
 
@@ -325,7 +354,8 @@ for (let f = 0; f < TOTAL_FRAMES; f++) {
   });
 
   const caps = [
-    [9.5, 15.5, "00", "The Floating Isle", "a cottage, a slide, a park, a pond"],
+    [9.2, 11.1, "00", "The Floating Isle", "a cottage, a slide, a park, a pond"],
+    [22.4, 27.6, "00", "Down on the isle", "the playground, the park, the pond"],
     [34.5, 41.5, "00", "Where the water falls", "the stream leaves the isle and becomes a waterfall"],
     [50.5, 53.5, "01", "The Observatory", "ferris wheel · carousel · lantern fair"],
     [64.8, 66.8, "✦", "Hana — the Architect", "reading the isles' blueprint"],
@@ -341,6 +371,7 @@ for (let f = 0; f < TOTAL_FRAMES; f++) {
     const ops = [];
     ops.push(["c-title", "opacity", titleOp.toFixed(3)]);
     ops.push(["c-bio", "opacity", bioOp.toFixed(3)]);
+    ops.push(["c-hero", "opacity", heroOp.toFixed(3)]);
     ops.push(["c-tech", "opacity", techOp.toFixed(3)]);
     ops.push(["c-end", "opacity", endOp.toFixed(3)]);
     ops.push(["c-mission", "opacity", missionOp.toFixed(3)]);
