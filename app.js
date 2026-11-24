@@ -496,7 +496,7 @@
 
     // 3. a music-box melody in the major pentatonic — simple, innocent, happy.
     //    Degrees 0 2 4 7 9 of the key never clash with any chord in the set.
-    const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
+    const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
     const phraseShapes = [
       [0, 2, 4, 2, 0], [4, 7, 9, 7, 4], [0, 4, 7, 12, 7],
       [7, 9, 12, 9, 7], [0, 2, 7, 4, 2], [12, 9, 7, 4, 0],
@@ -504,7 +504,7 @@
     const shape = phraseShapes[chordIdx % phraseShapes.length];
     const keyRoot = 72 + moodOffset;                 // C5 area
     shape.forEach((deg, i) => {
-      const f = midiToFreq(keyRoot + PENTA[deg]);
+      const f = midiToFreq(keyRoot + (PENTA[deg] ?? 12));
       const t = now + 0.9 + i * (0.92 * cfg.tempo) + Math.random() * 0.06;
       boxVoice(f, t, 2.3, cfg.bells * 0.9);
     });

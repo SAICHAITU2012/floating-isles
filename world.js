@@ -5729,6 +5729,7 @@
     station4Group.add(girl4.group);
     guideGirls.push(girl4);
     window.__guideGirls = guideGirls;
+    window.__stationGroups = [station0Group, station1Group, station2Group, station3Group, station4Group];
     clickTargets.push({ mesh: girl4.hitbox, stationIdx: 4, name: "✦ Meet Rei — Click for Portal Dossier", type: "guide" });
 
     // Store for animation
@@ -6376,9 +6377,26 @@
     camera.position.set(cx + mouse.x, cy - mouse.y, cz);
     camera.lookAt(currentLookAt);
 
+    // ── FILM HOOK ────────────────────────────────────────────────────────
+    // When a camera is driving a recording, it owns the shot: pos + look are
+    // set from outside and every other camera rule stands down. Nothing else
+    // in the world changes — the islands, girls and animals keep animating.
+    const filmOn = !!(window.__filmCam && window.__filmCam.on);
+    if (filmOn) {
+      const fc = window.__filmCam;
+      camera.position.copy(fc.pos);
+      camera.lookAt(fc.look);
+      if (fc.fov) {
+        camera.fov = fc.fov;
+        camera.updateProjectionMatrix();
+      }
+      if (fc.exposure) renderer.toneMappingExposure = fc.exposure;
+      introT = 1;
+    }
+
     // Opening dolly-in: a slow establishing sweep from high over the cloud
     // sea down into the hero framing — then the journey is yours
-    if (introT < 1) {
+    if (!filmOn && introT < 1) {
       introT = Math.min(1, introT + delta / 3.4);
       const e = 1 - Math.pow(1 - introT, 3);
       camera.position.lerpVectors(INTRO_FROM, camera.position, e);

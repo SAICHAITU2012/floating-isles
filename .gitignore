@@ -5,3 +5,6 @@ qa/
 _site/
 .DS_Store
 node_modules/
+
+# film renders (large, reproducible with tools/film.mjs + tools/score.mjs)
+film/
