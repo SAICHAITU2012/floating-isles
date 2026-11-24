@@ -267,13 +267,15 @@ add(131, [-40, 78, -170], [-70, 66, -220], 48, 1.22, 3);
 // · Hikari and the star cluster
 add(137, [-36, 84, -186], [-49, 76, -209], 46, 1.3, 3);
 add(141, [-44, 82, -196], [-50, 76, -210], 46, 1.3, 3);
-// · the portal: approach, then stand before the gate
-add(146, [38, 48, -314], [7, 35, -357], 52, 1.28, 4);
-add(152, [34, 44, -318], [6, 36, -356], 54, 1.3, 4);
-add(157, [30, 42, -324], [9, 37, -353], 54, 1.3, 4);
-// · pull back for the closing frame
-add(163, [34, 46, -316], [5, 37, -358], 54, 1.25, 4);
-add(168, [60, 58, -288], [5, 34, -358], 54, 1.2, 4);
+// · the portal: straight down the axis so the ring sits dead centre and the
+//   galaxy frames it, a held beat, then a slow dolly back that reveals the sky
+add(143.5, [7, 36.0, -278], [7, 32.0, -357], 50, 1.30, 4);
+add(149.0, [7, 34.6, -298], [7, 32.6, -357], 50, 1.30, 4);
+add(154.0, [7, 33.4, -313], [7, 32.6, -357], 50, 1.30, 4);
+add(156.5, [7, 33.6, -310], [7, 32.6, -357], 51, 1.30, 4);
+add(159.5, [7, 34.2, -298], [7, 32.4, -357], 53, 1.29, 4);
+add(163.0, [7, 35.4, -284], [7, 32.2, -357], 55, 1.27, 4);
+add(168.0, [7, 37.6, -264], [7, 32.0, -357], 58, 1.26, 4);
 
 const DUR = LIMIT > 0 ? Math.min(168, LIMIT) : 168;
 const TOTAL_FRAMES = Math.round(DUR * FPS);
@@ -343,7 +345,7 @@ for (let f = 0; f < TOTAL_FRAMES; f++) {
   const bioOp = fade(t, 52, 54.2, 62.5, 64.5);
   const heroOp = fade(t, 11.4, 12.9, 20.2, 21.6);
   const techOp = fade(t, 128.5, 131, 135.6, 137.2);
-  const endOp = fade(t, 160, 162.5, 168, 169);
+  const endOp = fade(t, 164.9, 166.3, 168, 169.5);
 
   let missionIdx = -1, missionOp = 0;
   missionWindows.forEach(([a, b], i) => {
@@ -363,7 +365,7 @@ for (let f = 0; f < TOTAL_FRAMES; f++) {
     [117.5, 121.5, "02", "Bridges between the missions", "every shipped project is an island here"],
     [122.5, 126, "03", "The Constellation", "six projects drawn as stars"],
     [134.5, 137.5, "✦", "Hikari — the Stargazer", "where the constellation converges"],
-    [143.5, 146.5, "04", "The Portal", "a galaxy, a ringed planet, a gate"],
+    [144.2, 148.6, "04", "The Portal", "a galaxy, a ringed planet, a gate"],
   ];
   const cap = caps.find(([a, b]) => t >= a && t <= b);
 
