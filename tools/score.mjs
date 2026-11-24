@@ -58,6 +58,16 @@ function addNote(t0, freq, dur, gain, pan = 0, kind = "pluck") {
     } else if (kind === "pluck") {
       env = Math.exp(-t / (dur * 0.22));
       s = Math.sin(w * i) + 0.30 * Math.sin(w2 * i) * Math.exp(-t / (dur * 0.12));
+    } else if (kind === "marimba") {
+      env = Math.exp(-t / (dur * 0.26));
+      s = Math.sin(w * i) + 0.34 * Math.sin(w4 * i) * Math.exp(-t / 0.16) + 0.12 * Math.sin(w * 3.01 * i) * Math.exp(-t / 0.10);
+    } else if (kind === "shaker") {
+      env = Math.exp(-t / 0.035);
+      s = (rand() * 2 - 1) * 0.55;
+    } else if (kind === "kick") {
+      const f = freq * (1 + 1.6 * Math.exp(-t / 0.055));
+      env = Math.exp(-t / 0.17);
+      s = Math.sin((2 * Math.PI * f * i) / SR);
     } else if (kind === "sub") {
       env = Math.min(1, t / 1.6) * Math.exp(-t / (dur * 1.4));
       s = Math.sin(w * i);
@@ -70,19 +80,19 @@ function addNote(t0, freq, dur, gain, pan = 0, kind = "pluck") {
 
 /* ── harmony ──────────────────────────────────────────────────────────── */
 const PROG = [
-  { root: 0, tones: [0, 4, 7, 11, 14] },   // Cmaj9
-  { root: 5, tones: [0, 4, 7, 11, 14] },   // Fmaj9
-  { root: 7, tones: [0, 4, 7, 9, 14] },    // G6/9
-  { root: 2, tones: [0, 4, 7, 11, 14] },   // Dmaj9
-  { root: -3, tones: [0, 4, 7, 11, 14] },  // A(add9)
-  { root: 5, tones: [0, 4, 7, 11, 16] },   // Fmaj7#11
+  [50, 57, 62, 64, 66],  // Dmaj9   — home, wide open
+  [47, 54, 57, 62, 66],  // Bm7     — lift
+  [43, 50, 54, 57, 59],  // Gmaj9   — bright
+  [45, 52, 57, 59, 61],  // Aadd9   — the pull forward
+  [42, 49, 54, 57, 59],  // F#m9    — golden, gentle
+  [40, 47, 52, 54, 57],  // Em9     — home again
 ];
 const MOOD = {
-  0: { off: 0, density: 1.0, pad: 0.050, box: 0.052, tempo: 1.0 },
-  1: { off: 2, density: 1.1, pad: 0.046, box: 0.054, tempo: 1.06 },
-  2: { off: 5, density: 1.05, pad: 0.048, box: 0.052, tempo: 1.03 },
-  3: { off: 7, density: 0.8, pad: 0.040, box: 0.058, tempo: 0.94 },
-  4: { off: 3, density: 0.9, pad: 0.046, box: 0.050, tempo: 0.97 },
+  0: { density: 1.18, pad: 0.044, box: 0.056, tempo: 1.00, perc: 1.00 },  // the isle, daylight
+  1: { density: 1.30, pad: 0.042, box: 0.058, tempo: 1.06, perc: 1.10 },  // carnival
+  2: { density: 1.10, pad: 0.044, box: 0.055, tempo: 1.02, perc: 1.00 },  // archipelago
+  3: { density: 0.78, pad: 0.038, box: 0.060, tempo: 0.93, perc: 0.42 },  // constellation, airy
+  4: { density: 0.92, pad: 0.043, box: 0.054, tempo: 0.96, perc: 0.60 },  // portal
 };
 
 // scenes come from the timeline: { start, dur, num } where num is the realm id
@@ -92,47 +102,55 @@ const sections = tl.scenes.map((s) => ({
   st: Number(String(s.num || "0").replace(/[^0-9]/g, "")) || 0,
 }));
 
-const CHORD = 8.4;
-const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
 const shapes = [
-  [0, 2, 4, 2, 0], [4, 7, 9, 7, 4], [0, 4, 7, 12, 7],
-  [7, 9, 12, 9, 7], [0, 2, 7, 4, 2], [12, 9, 7, 4, 0],
+  [0, 2, 4, 2, 0], [2, 4, 7, 4, 2], [0, 4, 7, 9, 7],
+  [4, 7, 9, 12, 9], [7, 9, 12, 9, 7], [0, 2, 7, 4, 2],
+  [9, 7, 4, 2, 4], [12, 9, 7, 9, 12], [0, 4, 2, 7, 0],
 ];
+const BEAT = 1.0;          // seconds per beat, 15 bars per minute — unhurried
+const BAR = BEAT * 4;
 
 let chordIdx = 0, shapeIdx = 0;
 for (const sec of sections) {
   const mood = MOOD[sec.st] || MOOD[0];
-  // chords land on a grid that starts with the section, so harmony follows cuts
-  for (let t = sec.start; t < sec.start + sec.dur - 0.1; t += CHORD) {
-    const ch = PROG[chordIdx % PROG.length];
-    const rootM = 60 + ch.root + mood.off;
-    const tones = ch.tones.map((x) => rootM + x);
+  for (let t = sec.start; t < sec.start + sec.dur - 0.1; t += BAR) {
+    const tones = PROG[chordIdx % PROG.length];
 
-    // pad bed
-    addNote(t, midi(tones[0] - 12), CHORD * 1.25, mood.pad * 1.1, -0.25, "pad");
-    addNote(t + 0.12, midi(tones[0]), CHORD * 1.2, mood.pad * 0.8, 0.15, "pad");
-    addNote(t + 0.26, midi(tones[2]), CHORD * 1.15, mood.pad * 0.62, 0.35, "pad");
-    addNote(t + 0.38, midi(tones[3]), CHORD * 1.1, mood.pad * 0.5, -0.4, "pad");
-    addNote(t, midi(tones[0] - 24), CHORD * 1.5, 0.032, 0, "sub");
+    // pad bed — soft, sits underneath everything
+    addNote(t, midi(tones[0] - 12), BAR * 1.3, mood.pad * 1.15, -0.28, "pad");
+    addNote(t + 0.10, midi(tones[0]), BAR * 1.25, mood.pad * 0.85, 0.16, "pad");
+    addNote(t + 0.22, midi(tones[2]), BAR * 1.2, mood.pad * 0.66, 0.36, "pad");
+    addNote(t + 0.34, midi(tones[3]), BAR * 1.15, mood.pad * 0.52, -0.42, "pad");
+    addNote(t, midi(tones[0] - 24), BAR * 1.6, 0.030, 0, "sub");
 
-    // arpeggio
-    const pool = [...tones, tones[0] + 12, tones[2] + 12];
-    const n = Math.max(3, Math.round(4 * mood.density));
+    // marimba arpeggio — the happy, moving part
+    const pool = [...tones, tones[0] + 12, tones[2] + 12, tones[4] + 12];
+    const n = Math.max(4, Math.round(5 * mood.density));
     for (let i = 0; i < n; i++) {
-      const f = pool[(i * 2 + chordIdx) % pool.length];
-      addNote(t + 0.5 + i * (0.86 * mood.tempo), midi(f), 2.6, mood.box * 0.55, (i % 2 ? 0.3 : -0.3), "pluck");
+      const f = pool[(i * 2 + chordIdx) % pool.length] + 12;
+      addNote(t + 0.35 + i * (BEAT * 0.5 / mood.tempo), midi(f), 1.5, mood.box * 0.5, (i % 2 ? 0.32 : -0.32), "marimba");
     }
 
-    // music-box melody
+    // music-box tune, major pentatonic on top
     const shape = shapes[shapeIdx % shapes.length];
     shape.forEach((deg, i) => {
-      addNote(t + 0.9 + i * (0.92 * mood.tempo), midi(72 + mood.off + PENTA[deg]), 2.3, mood.box, ((i % 3) - 1) * 0.35, "box");
+      addNote(t + 0.55 + i * (BEAT * 0.72 / mood.tempo), midi(74 + PENTA[deg]), 2.0, mood.box, ((i % 3) - 1) * 0.34, "box");
     });
     shapeIdx++;
 
-    // a high bell halo
-    if (rand() < 0.6) {
-      addNote(t + 3.6 + rand() * 1.4, midi(tones[2] + 24), 4.2, mood.box * 0.42, 0.5, "box");
+    // a bell halo at the top of every other bar
+    if (chordIdx % 2 === 1) addNote(t + 2.2 + rand() * 0.8, midi(tones[2] + 24), 3.6, mood.box * 0.5, 0.5, "box");
+    if (rand() < 0.34) addNote(t + 1.4 + rand() * 1.6, midi(tones[4] + 24), 3.0, mood.box * 0.34, -0.5, "marimba");
+
+    // percussion — a light shaker running eighths, a soft heartbeat kick
+    if (mood.perc > 0.5) {
+      for (let i = 0; i < 8; i++) {
+        const g = (i % 2 === 0 ? 0.026 : 0.015) * mood.perc;
+        addNote(t + i * (BEAT * 0.5), 1, 0.09, g, i % 2 ? 0.4 : -0.4, "shaker");
+      }
+      addNote(t + 0.02, 52, 0.42, 0.055 * mood.perc, 0, "kick");
+      addNote(t + BEAT * 2, 52, 0.38, 0.042 * mood.perc, 0, "kick");
     }
     chordIdx++;
   }
@@ -186,9 +204,9 @@ const ref = sorted[Math.floor(sorted.length * 0.999)] || 1;
 let peak = 0;
 for (let i = 0; i < N; i++) peak = Math.max(peak, mags[i]);
 console.log(`raw peak ${peak.toFixed(3)} · p99.9 ${ref.toFixed(3)}`);
-const norm = 0.62 / ref;
+const norm = 0.70 / ref;
 
-const fadeIn = Math.floor(2.0 * SR);
+const fadeIn = Math.floor(1.2 * SR);
 const fadeOut = Math.floor(4.5 * SR);
 
 const out = Buffer.alloc(44 + N * 4);
